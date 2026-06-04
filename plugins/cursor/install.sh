@@ -143,41 +143,71 @@ cat >"${CURSOR_DIR}/hooks.json" <<EOF
 }
 EOF
 
-# mcp.json — merge agent-brain server if jq available
-NEW_MCP="$(mktemp)"
-if [[ -n "$JWT" ]]; then
-  cat >"$NEW_MCP" <<EOF
-{
-  "mcpServers": {
-    "agent-brain": {
-      "type": "http",
-      "url": "${MCP_URL}",
-      "envFile": "${ENV_FILE}",
-      "headers": {
-        "Authorization": "Bearer \${NIGHTHAWK_JWT}",
-        "X-Agent-ID": "\${NIGHTHAWK_AGENT_ID}",
-        "X-Session-ID": "\${NIGHTHAWK_SESSION_ID}"
-      }
-    }
-  }
-}
-EOF
-else
-  sed -e "s|__NIGHTHAWK_MCP_URL__|${MCP_URL}|g" \
-      -e "s|__NIGHTHAWK_ENV_FILE__|${ENV_FILE}|g" \
-      "${ROOT}/plugins/cursor/templates/mcp.json" >"$NEW_MCP"
-fi
-
+# mcp.json — Cursor HTTP/SSE ignores envFile; ${NIGHTHAWK_*} is not expanded. Inline secrets at install.
 MCP_DEST="${CURSOR_DIR}/mcp.json"
-if [[ -f "$MCP_DEST" ]] && command -v jq >/dev/null 2>&1; then
-  jq -s '.[0].mcpServers["agent-brain"] = .[1].mcpServers["agent-brain"] | .[0]' \
-    "$MCP_DEST" "$NEW_MCP" >"${MCP_DEST}.tmp" && mv "${MCP_DEST}.tmp" "$MCP_DEST"
-  echo "Merged agent-brain into ${MCP_DEST}"
+if command -v jq >/dev/null 2>&1; then
+  if [[ -n "$JWT" ]]; then
+    NEW_MCP="$(jq -n \
+      --arg url "$MCP_URL" \
+      --arg jwt "$JWT" \
+      --arg agent "$AGENT_ID" \
+      '{
+        mcpServers: {
+          "agent-brain": {
+            type: "http",
+            url: $url,
+            headers: {
+              Authorization: ("Bearer " + $jwt),
+              "X-Agent-ID": $agent
+            }
+          }
+        }
+      }')"
+  else
+    NEW_MCP="$(jq -n \
+      --arg url "$MCP_URL" \
+      --arg key "$API_KEY" \
+      --arg agent "$AGENT_ID" \
+      '{
+        mcpServers: {
+          "agent-brain": {
+            type: "http",
+            url: $url,
+            headers: {
+              "X-API-Key": $key,
+              "X-Agent-ID": $agent
+            }
+          }
+        }
+      }')"
+  fi
+  if [[ -f "$MCP_DEST" ]]; then
+    jq -s '.[0].mcpServers["agent-brain"] = .[1].mcpServers["agent-brain"] | .[0]' \
+      "$MCP_DEST" <(echo "$NEW_MCP") >"${MCP_DEST}.tmp" && mv "${MCP_DEST}.tmp" "$MCP_DEST"
+    echo "Merged agent-brain into ${MCP_DEST} (credentials inlined for Cursor MCP)"
+  else
+    echo "$NEW_MCP" >"$MCP_DEST"
+    echo "Wrote ${MCP_DEST} (credentials inlined for Cursor MCP)"
+  fi
+  chmod 600 "$MCP_DEST" 2>/dev/null || true
 else
-  cp "$NEW_MCP" "$MCP_DEST"
-  echo "Wrote ${MCP_DEST}"
+  echo "warning: jq not found; writing mcp.json via sed (install jq for JWT installs)" >&2
+  NEW_MCP="$(mktemp)"
+  sed -e "s|__NIGHTHAWK_MCP_URL__|${MCP_URL}|g" \
+      -e "s|__NIGHTHAWK_API_KEY__|${API_KEY}|g" \
+      -e "s|__NIGHTHAWK_AGENT_ID__|${AGENT_ID}|g" \
+      "${ROOT}/plugins/cursor/templates/mcp.json" >"$NEW_MCP"
+  if [[ -f "$MCP_DEST" ]]; then
+    # Without jq we cannot merge; overwrite agent-brain entry only if user confirms manually
+    cp "$NEW_MCP" "${MCP_DEST}.agent-brain.new"
+    echo "Wrote ${MCP_DEST}.agent-brain.new — merge into ${MCP_DEST} manually"
+  else
+    cp "$NEW_MCP" "$MCP_DEST"
+    echo "Wrote ${MCP_DEST} (credentials inlined)"
+  fi
+  rm -f "$NEW_MCP"
+  chmod 600 "$MCP_DEST" 2>/dev/null || true
 fi
-rm -f "$NEW_MCP"
 
 echo ""
 echo "Installed Agent Brain Cursor plugin (${SCOPE})"
@@ -190,6 +220,7 @@ echo "Server checklist:"
 echo "  1. Memory Explorer → Settings: register agent \"${AGENT_ID}\" (iam_service_accounts)"
 echo "  2. Create API key or JWT in Settings if you did not pass --api-key / --jwt"
 echo ""
+echo "MCP note: ${ENV_FILE} is for hooks/mcp-call only. Cursor remote MCP does not load envFile or \${NIGHTHAWK_*}."
 echo "Next: restart Cursor, enable Hooks (Settings), check Hooks output channel."
 echo "Smoke test:"
 echo "  set -a && source ${ENV_FILE} && set +a"

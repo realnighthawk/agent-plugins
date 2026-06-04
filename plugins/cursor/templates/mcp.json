@@ -3,11 +3,9 @@
     "agent-brain": {
       "type": "http",
       "url": "__NIGHTHAWK_MCP_URL__",
-      "envFile": "__NIGHTHAWK_ENV_FILE__",
       "headers": {
-        "X-API-Key": "${NIGHTHAWK_API_KEY}",
-        "X-Agent-ID": "${NIGHTHAWK_AGENT_ID}",
-        "X-Session-ID": "${NIGHTHAWK_SESSION_ID}"
+        "X-API-Key": "__NIGHTHAWK_API_KEY__",
+        "X-Agent-ID": "__NIGHTHAWK_AGENT_ID__"
       }
     }
   }
