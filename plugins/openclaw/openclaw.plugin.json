@@ -1,0 +1,58 @@
+{
+  "id": "agent-brain",
+  "kind": "memory",
+  "name": "Agent Brain",
+  "description": "Unified long-term memory via hosted agent-brain MCP (auto recall + capture)",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Hosted agent-brain SSE URL (e.g. https://memory.example.com/sse)"
+      },
+      "apiKey": {
+        "type": "string",
+        "description": "API key (maps to user_id on server). Use apiKey or jwt."
+      },
+      "jwt": {
+        "type": "string",
+        "description": "Bearer JWT (sub = user id). Use apiKey or jwt."
+      },
+      "agentId": {
+        "type": "string",
+        "description": "Fixed agent id (e.g. openclaw-alice). Overrides agentPrefix derivation."
+      },
+      "agentPrefix": {
+        "type": "string",
+        "default": "openclaw",
+        "description": "Prefix when deriving agent id from sessionKey (openclaw-alice-main)"
+      },
+      "autoRecall": {
+        "type": "boolean",
+        "default": true,
+        "description": "Inject memories before each prompt (before_prompt_build)"
+      },
+      "autoCapture": {
+        "type": "boolean",
+        "default": true,
+        "description": "Write durable facts after each agent run (agent_end)"
+      },
+      "recallLimit": {
+        "type": "number",
+        "default": 8,
+        "description": "Max memories per recall"
+      },
+      "recallMinPromptLength": {
+        "type": "number",
+        "default": 12,
+        "description": "Skip recall for very short prompts"
+      },
+      "mcpCallPath": {
+        "type": "string",
+        "description": "Path to mcp-call binary (default: <plugin>/bin/mcp-call)"
+      }
+    },
+    "required": ["url"]
+  }
+}

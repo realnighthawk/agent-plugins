@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "agent-brain": {
+      "type": "http",
+      "url": "${NIGHTHAWK_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${NIGHTHAWK_JWT}",
+        "X-Agent-ID": "${NIGHTHAWK_AGENT_ID}",
+        "X-Session-ID": "${NIGHTHAWK_SESSION_ID}"
+      }
+    }
+  }
+}

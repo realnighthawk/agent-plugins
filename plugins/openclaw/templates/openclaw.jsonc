@@ -1,0 +1,32 @@
+// Example ~/.openclaw/openclaw.json (or project config) — adjust paths and secrets.
+{
+  "plugins": {
+    "slots": {
+      "memory": "agent-brain"
+    },
+    "entries": {
+      "agent-brain": {
+        "enabled": true,
+        "config": {
+          "url": "${NIGHTHAWK_MCP_URL}",
+          "apiKey": "${NIGHTHAWK_API_KEY}",
+          "agentId": "openclaw-alice",
+          "autoRecall": true,
+          "autoCapture": true,
+          "recallLimit": 8
+        }
+      }
+    }
+  },
+  "mcp": {
+    "agent-brain": {
+      "type": "streamable-http",
+      "url": "${NIGHTHAWK_MCP_URL}",
+      "headers": {
+        "X-API-Key": "${NIGHTHAWK_API_KEY}",
+        "X-Agent-ID": "openclaw-alice",
+        "X-Session-ID": "openclaw-session"
+      }
+    }
+  }
+}

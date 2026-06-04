@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+agent_brain_format_recall() {
+  local json="$1"
+  local max_items="${NIGHTHAWK_RECALL_MAX:-8}"
+  local lines
+  lines=$(echo "$json" | jq -r --argjson max "$max_items" '
+    (if type == "array" then . elif .memories then .memories else [] end)[:$max][]
+    | "- [\(.subject_raw // .SubjectRaw // "fact")] \(.content // .Content) (conf \(.confidence // .Confidence // 0.8))"
+  ' 2>/dev/null) || return 1
+  if [[ -z "$lines" ]]; then
+    return 0
+  fi
+  printf '%s\n%s' "## Memory context (agent-brain)" "$lines"
+}

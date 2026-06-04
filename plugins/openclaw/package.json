@@ -1,0 +1,33 @@
+{
+  "name": "@realnighthawk/agent-brain-openclaw",
+  "version": "0.1.0",
+  "description": "AgentBrain unified memory for OpenClaw (hosted MCP + lifecycle hooks)",
+  "type": "module",
+  "license": "MIT",
+  "openclaw": {
+    "extensions": ["./index.ts"]
+  },
+  "files": [
+    "index.ts",
+    "config.ts",
+    "client.ts",
+    "recall.ts",
+    "capture.ts",
+    "format.ts",
+    "session-state.ts",
+    "openclaw.plugin.json",
+    "README.md",
+    "templates/"
+  ],
+  "peerDependencies": {
+    "openclaw": ">=2026.3.0"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

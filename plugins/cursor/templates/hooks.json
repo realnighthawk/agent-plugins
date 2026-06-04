@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": ".cursor/hooks/session-start.sh",
+        "timeout": 15
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": ".cursor/hooks/recall.sh",
+        "matcher": "UserPromptSubmit",
+        "timeout": 30
+      }
+    ],
+    "afterAgentResponse": [
+      {
+        "command": ".cursor/hooks/index.sh",
+        "timeout": 30
+      }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/index.sh",
+        "timeout": 15
+      }
+    ]
+  }
+}

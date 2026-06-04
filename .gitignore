@@ -1,0 +1,5 @@
+plugins/cursor/bin/mcp-call
+plugins/claude-code/bin/mcp-call
+plugins/openclaw/bin/mcp-call
+plugins/openclaw/node_modules/
+dist/
