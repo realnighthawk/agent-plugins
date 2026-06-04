@@ -30,6 +30,8 @@ Hooks use a small Go binary (`cmd/mcp-call`). Install scripts download releases 
 
 Tag `v*` releases publish `mcp-call-linux-amd64`, `mcp-call-darwin-arm64`, etc. (see [.github/workflows/publish.yml](.github/workflows/publish.yml)).
 
+**First-time publish:** the repo must be **public**, and you must push a `v*` tag so Actions uploads release assets. Checklist: [docs/PUBLISHING.md](docs/PUBLISHING.md).
+
 ## Tests
 
 ```bash
