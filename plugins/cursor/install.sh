@@ -13,10 +13,24 @@
 #   curl -fsSL https://raw.githubusercontent.com/realnighthawk/agent-plugins/main/plugins/cursor/install.sh | bash -s -- --global --api-key ...
 set -euo pipefail
 
-SCRIPT_PATH="${BASH_SOURCE[0]}"
-# shellcheck source=../../scripts/lib/install-repo.sh
-. "$(cd "$(dirname "$SCRIPT_PATH")/../.." && pwd)/scripts/lib/install-repo.sh"
-ROOT="$(plugins_repo_root "$SCRIPT_PATH")"
+# Bootstrap lib (curl | bash has no BASH_SOURCE — fetch install-repo.sh from GitHub).
+_script_path="${BASH_SOURCE[0]:-}"
+_lib=""
+if [[ -n "${_script_path}" ]]; then
+  _lib="$(cd "$(dirname "${_script_path}")/../.." 2>/dev/null && pwd)/scripts/lib/install-repo.sh"
+fi
+if [[ -n "${_lib}" && -f "${_lib}" ]]; then
+  # shellcheck source=../../scripts/lib/install-repo.sh
+  . "${_lib}"
+else
+  _bootstrap="$(mktemp)"
+  curl -fsSL "https://raw.githubusercontent.com/realnighthawk/agent-plugins/main/scripts/lib/install-repo.sh" -o "${_bootstrap}"
+  # shellcheck source=/dev/null
+  . "${_bootstrap}"
+  rm -f "${_bootstrap}"
+fi
+plugins_install_setup cursor "${_script_path}"
+ROOT="${PLUGINS_ROOT}"
 SCOPE="global"
 MCP_URL="https://agent-memory.nighthawklabs.org/sse"
 AGENT_ID=""
