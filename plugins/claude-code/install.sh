@@ -215,9 +215,28 @@ fi
 echo "Installing mcp-call..."
 install_mcp_call "${PLUGIN_DIR}/bin/mcp-call"
 
-if [[ -n "$JWT" ]]; then
-  cp "${PLUGIN_DIR}/templates/mcp-jwt.json" "${PLUGIN_DIR}/.mcp.json"
-fi
+write_mcp_config() {
+  local mcp_file="${PLUGIN_DIR}/.mcp.json"
+  if [[ -n "$JWT" ]]; then
+    jq -n \
+      --arg url "$MCP_URL" \
+      --arg jwt "$JWT" \
+      --arg agent_id "$AGENT_ID" \
+      '{"mcpServers":{"agent-brain":{"type":"sse","url":$url,"headers":{"Authorization":("Bearer "+$jwt),"X-Agent-ID":$agent_id}}}}' \
+      > "$mcp_file"
+  else
+    jq -n \
+      --arg url "$MCP_URL" \
+      --arg api_key "$API_KEY" \
+      --arg agent_id "$AGENT_ID" \
+      '{"mcpServers":{"agent-brain":{"type":"sse","url":$url,"headers":{"X-API-Key":$api_key,"X-Agent-ID":$agent_id}}}}' \
+      > "$mcp_file"
+  fi
+  chmod 600 "$mcp_file"
+  echo "Wrote MCP config (with credentials) to ${mcp_file}"
+}
+
+write_mcp_config
 
 echo ""
 echo "Installed Agent Brain for Claude Code"
@@ -225,9 +244,10 @@ echo "  Plugin dir:  ${PLUGIN_DIR}"
 echo "  MCP URL:     ${MCP_URL}"
 echo "  Agent ID:    ${AGENT_ID}"
 echo "  Env file:    ${ENV_FILE}"
-echo "  Claude env:  ~/.claude/settings.json (NIGHTHAWK_* injected for hooks + MCP)"
+echo "  Claude env:  ~/.claude/settings.json (NIGHTHAWK_* injected for hooks)"
+echo "  MCP config:  ${PLUGIN_DIR}/.mcp.json (credentials written directly)"
 echo ""
-echo "Optional: also source ${ENV_FILE} in your shell profile for CLI mcp-call."
+echo "Optional: source ${ENV_FILE} in your shell profile for CLI mcp-call usage."
 echo ""
 echo "Server checklist:"
 echo "  1. Memory Explorer → Settings: register agent \"${AGENT_ID}\" with write policy for user-stated facts"
