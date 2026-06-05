@@ -33,6 +33,7 @@ if [[ -z "${ROOT}" ]]; then
   ROOT="${_dest}"
 fi
 PLUGIN_DIR="${ROOT}/plugins/claude-code"
+PLUGIN_GITHUB_REPO="${AGENT_PLUGINS_GITHUB_REPO:-realnighthawk/agent-plugins}"
 
 MCP_URL="https://agent-memory.nighthawklabs.org/sse"
 AGENT_ID=""
@@ -157,7 +158,7 @@ register_claude_plugin() {
   fi
 
   echo "Registering marketplace with Claude Code..."
-  if ! claude plugin marketplace add "${ROOT}" --scope user 2>&1; then
+  if ! claude plugin marketplace add "${PLUGIN_GITHUB_REPO}" --scope user 2>&1; then
     echo "Note: marketplace may already be registered (agent-plugins)." >&2
   fi
 
@@ -169,12 +170,12 @@ if [[ "$SKIP_PLUGIN_ADD" -eq 0 ]]; then
   if command -v claude >/dev/null 2>&1; then
     register_claude_plugin || {
       echo "Plugin registration failed. Install manually:" >&2
-      echo "  claude plugin marketplace add ${ROOT} --scope user" >&2
+      echo "  claude plugin marketplace add ${PLUGIN_GITHUB_REPO} --scope user" >&2
       echo "  claude plugin install agent-brain@agent-plugins --scope user" >&2
     }
   else
     echo "Claude CLI not on PATH — install Claude Code, then run:" >&2
-    echo "  claude plugin marketplace add ${ROOT} --scope user" >&2
+    echo "  claude plugin marketplace add ${PLUGIN_GITHUB_REPO} --scope user" >&2
     echo "  claude plugin install agent-brain@agent-plugins --scope user" >&2
   fi
 fi
