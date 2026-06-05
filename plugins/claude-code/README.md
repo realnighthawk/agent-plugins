@@ -32,13 +32,14 @@ From a cloned repo:
 ./plugins/claude-code/install.sh --url https://memory.example.com/sse --agent-id claude-you --api-key YOUR_KEY
 ```
 
-The script downloads `mcp-call`, runs `claude plugin add --path …`, and writes `~/.config/agent-brain/claude.env` (source it from your shell profile).
+The script downloads `mcp-call`, registers the `agent-plugins` marketplace, runs `claude plugin install agent-brain@agent-plugins`, and writes `~/.config/agent-brain/claude.env` (source it from your shell profile).
 
 ## Manual install
 
 ```bash
 ./scripts/fetch-mcp-call.sh plugins/claude-code/bin/mcp-call
-claude plugin add --path ./plugins/claude-code
+claude plugin marketplace add . --scope user
+claude plugin install agent-brain@agent-plugins --scope user
 ```
 
 Set environment variables in your shell or Claude Code user config (see `.env.example`):

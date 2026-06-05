@@ -98,15 +98,33 @@ else
   echo "export NIGHTHAWK_API_KEY=${API_KEY}" >>"$ENV_FILE"
 fi
 
+register_claude_plugin() {
+  local marketplace="${ROOT}/.claude-plugin/marketplace.json"
+  if [[ ! -f "${marketplace}" ]]; then
+    echo "Missing ${marketplace} — cannot register with Claude Code." >&2
+    return 1
+  fi
+
+  echo "Registering marketplace with Claude Code..."
+  if ! claude plugin marketplace add "${ROOT}" --scope user 2>&1; then
+    echo "Note: marketplace may already be registered (agent-plugins)." >&2
+  fi
+
+  echo "Installing agent-brain plugin..."
+  claude plugin install agent-brain@agent-plugins --scope user
+}
+
 if [[ "$SKIP_PLUGIN_ADD" -eq 0 ]]; then
   if command -v claude >/dev/null 2>&1; then
-    echo "Registering plugin with Claude Code..."
-    claude plugin add --path "${PLUGIN_DIR}" || {
-      echo "Note: plugin may already be installed. Run: claude plugin list" >&2
+    register_claude_plugin || {
+      echo "Plugin registration failed. Install manually:" >&2
+      echo "  claude plugin marketplace add ${ROOT} --scope user" >&2
+      echo "  claude plugin install agent-brain@agent-plugins --scope user" >&2
     }
   else
     echo "Claude CLI not on PATH — install Claude Code, then run:" >&2
-    echo "  claude plugin add --path ${PLUGIN_DIR}" >&2
+    echo "  claude plugin marketplace add ${ROOT} --scope user" >&2
+    echo "  claude plugin install agent-brain@agent-plugins --scope user" >&2
   fi
 fi
 

@@ -20,13 +20,15 @@ curl -fsSL https://raw.githubusercontent.com/realnighthawk/agent-plugins/main/pl
   --api-key YOUR_KEY
 ```
 
-Then add to `~/.zshrc` (or restart terminal after):
+Then add to `~/.zshrc` (or merge into `~/.claude/settings.json` → `env` so MCP works when Claude is not launched from a shell):
 
 ```bash
 source ~/.config/agent-brain/claude.env
 ```
 
 Or from a clone: `./plugins/claude-code/install.sh` with the same flags.
+
+The installer registers marketplace `agent-plugins` and runs `claude plugin install agent-brain@agent-plugins`.
 
 Export env manually (shell profile or Claude config):
 
