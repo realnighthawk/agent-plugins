@@ -1,0 +1,125 @@
+import type { AgentBrainPluginConfig } from "./config.js";
+import { callMcpTool } from "./client.js";
+
+const MAX_TIER_CHARS = 1600;
+const MAX_TOTAL_CHARS = 4800;
+
+type TierEntry = { header: string; raw: string };
+export type SessionSkill = { block: string; subjects: string[] };
+
+function extractTierText(raw: string): string {
+  if (!raw.trim()) return "";
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed === "string") return parsed;
+    if (parsed !== null && typeof parsed === "object") {
+      const p = parsed as Record<string, unknown>;
+      for (const key of ["content", "text", "profile", "summary"]) {
+        if (typeof p[key] === "string") return p[key] as string;
+      }
+      const items = Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>[])
+        : Array.isArray(p.memories)
+          ? (p.memories as Record<string, unknown>[])
+          : Array.isArray(p.preferences)
+            ? (p.preferences as Record<string, unknown>[])
+            : null;
+      if (items) {
+        return items
+          .map((m) => {
+            const subj = String(m.subject_raw ?? m.subject ?? "fact");
+            const content = String(m.content ?? m.text ?? m.value ?? "");
+            return `- [${subj}] ${content}`;
+          })
+          .join("\n");
+      }
+    }
+  } catch {
+    return raw.trim();
+  }
+  return "";
+}
+
+function extractSubjects(raw: string): string[] {
+  if (!raw.trim()) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    const items = Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>[])
+      : (parsed as Record<string, unknown>).memories
+          ? ((parsed as Record<string, unknown>).memories as Record<string, unknown>[])
+          : (parsed as Record<string, unknown>).preferences
+            ? ((parsed as Record<string, unknown>).preferences as Record<string, unknown>[])
+            : [];
+    return items
+      .map((m) => String(m.subject_raw ?? m.subject ?? ""))
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function buildBlock(tiers: TierEntry[]): { block: string; subjects: string[] } {
+  const sections: string[] = [];
+  const subjects: string[] = [];
+  let totalChars = 0;
+
+  for (const tier of tiers) {
+    const text = extractTierText(tier.raw).slice(0, MAX_TIER_CHARS).trim();
+    subjects.push(...extractSubjects(tier.raw));
+    if (!text) continue;
+    const section = `${tier.header}\n${text}`;
+    const remaining = MAX_TOTAL_CHARS - totalChars;
+    if (remaining <= tier.header.length + 20) break;
+    sections.push(section.length > remaining ? section.slice(0, remaining) : section);
+    totalChars += section.length;
+  }
+
+  return { block: sections.join("\n\n"), subjects };
+}
+
+// In-process cache: one entry per sessionKey, populated on first call.
+const _cache = new Map<string, SessionSkill>();
+
+export async function getSessionSkill(
+  cfg: AgentBrainPluginConfig,
+  rootDir: string | undefined,
+  sessionKey: string | undefined,
+  cwdBasename: string,
+): Promise<SessionSkill> {
+  const key = sessionKey ?? "";
+  const cached = _cache.get(key);
+  if (cached) return cached;
+
+  const [agentRes, userRes, projectRes] = await Promise.allSettled([
+    callMcpTool(
+      cfg,
+      rootDir,
+      "retrieve_skills_for_context",
+      { context: `agent:${cfg.agentId ?? cfg.agentPrefix}` },
+      sessionKey,
+    ),
+    callMcpTool(cfg, rootDir, "memory_preference_profile", {}, sessionKey),
+    callMcpTool(
+      cfg,
+      rootDir,
+      "memory_search",
+      { query: cwdBasename, limit: 6, use_graph: true },
+      sessionKey,
+    ),
+  ]);
+
+  const tiers: TierEntry[] = [
+    { header: "## Agent context", raw: agentRes.status === "fulfilled" ? agentRes.value : "" },
+    { header: "## Your profile", raw: userRes.status === "fulfilled" ? userRes.value : "" },
+    { header: "## Project context", raw: projectRes.status === "fulfilled" ? projectRes.value : "" },
+  ];
+
+  const result = buildBlock(tiers);
+  _cache.set(key, result);
+  return result;
+}
+
+export function clearSessionSkillCache(): void {
+  _cache.clear();
+}

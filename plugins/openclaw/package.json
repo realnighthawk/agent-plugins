@@ -28,6 +28,6 @@
     }
   },
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "test": "node --experimental-strip-types --loader ./test/ts-hooks.mjs --test test/*.test.js"
   }
 }
