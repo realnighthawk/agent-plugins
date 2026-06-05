@@ -81,13 +81,12 @@ mkdir -p "${CURSOR_DIR}/bin" "${CURSOR_DIR}/hooks/lib" "${CURSOR_DIR}/state"
 
 # Fetch plugin files from local checkout or GitHub tarball.
 fetch_plugin_files() {
-  local src
+  local src tmpdir=""
   if [[ -n "${LOCAL_CHECKOUT}" ]]; then
     src="${LOCAL_CHECKOUT}/plugins/cursor"
   else
-    local tmpdir url
+    local url
     tmpdir=$(mktemp -d)
-    trap 'rm -rf "$tmpdir"' RETURN
 
     if [[ "$AGENT_PLUGINS_REF" == v* ]]; then
       url="https://github.com/${PLUGIN_GITHUB_REPO}/archive/refs/tags/${AGENT_PLUGINS_REF}.tar.gz"
@@ -103,6 +102,7 @@ fetch_plugin_files() {
   cp -R "${src}/hooks/"*.sh "${CURSOR_DIR}/hooks/"
   cp -R "${src}/hooks/lib/"*.sh "${CURSOR_DIR}/hooks/lib/"
   chmod +x "${CURSOR_DIR}/hooks/"*.sh "${CURSOR_DIR}/hooks/lib/"*.sh
+  [[ -n "$tmpdir" ]] && rm -rf "$tmpdir"
 }
 
 # Install mcp-call binary to DEST.
