@@ -15,6 +15,7 @@
     "capture.ts",
     "format.ts",
     "session-state.ts",
+    "session-skill.ts",
     "openclaw.plugin.json",
     "README.md",
     "templates/"

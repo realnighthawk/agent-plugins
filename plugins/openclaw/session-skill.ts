@@ -73,8 +73,9 @@ function buildBlock(tiers: TierEntry[]): { block: string; subjects: string[] } {
     const separatorCost = sections.length > 0 ? 2 : 0;
     const remaining = MAX_TOTAL_CHARS - totalChars - separatorCost;
     if (remaining <= tier.header.length + 20) break;
-    sections.push(section.length > remaining ? section.slice(0, remaining) : section);
-    totalChars += section.length + separatorCost;
+    const pushed = section.length > remaining ? section.slice(0, remaining) : section;
+    sections.push(pushed);
+    totalChars += pushed.length + separatorCost;
   }
 
   return { block: sections.join("\n\n"), subjects };
