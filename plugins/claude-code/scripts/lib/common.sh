@@ -39,7 +39,8 @@ agent_brain_resolve_mcp_call() {
 
 agent_brain_mcp_call() {
   local tool="$1"
-  local args="${2:-{}}"
+  local args="${2:-}"
+  [[ -z "$args" ]] && args="{}"
   local bin
   if ! bin="$(agent_brain_resolve_mcp_call)"; then
     echo "agent-brain: mcp-call not found; run: go build -o plugins/claude-code/bin/mcp-call ./cmd/mcp-call" >&2
