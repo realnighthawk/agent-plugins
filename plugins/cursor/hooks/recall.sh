@@ -22,8 +22,7 @@ existing="$(agent_brain_load_session || true)"
 
 skill_block=""
 skill_file="$(agent_brain_skill_block_file)"
-if [[ -f "$skill_file" ]]; then
-  skill_block=$(cat "$skill_file")
+if skill_block=$(cat "$skill_file" 2>/dev/null); then
   rm -f "$skill_file"
 fi
 
