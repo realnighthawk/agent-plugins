@@ -53,6 +53,33 @@ echo "$out" | jq -e '.hookSpecificOutput.hookEventName == "SessionStart"' >/dev/
 export NIGHTHAWK_MCP_CALL="$REAL_MOCK"
 rm -f "$FAIL_MOCK"
 
+echo "== SessionStart: token cap enforced =="
+OVERSIZE_MOCK=$(mktemp); chmod +x "$OVERSIZE_MOCK"
+# Generate a mock that returns >1600 chars per tier
+cat > "$OVERSIZE_MOCK" <<'MOCK'
+#!/usr/bin/env bash
+case "${1:-}" in
+  retrieve_skills_for_context)
+    content=$(printf '%2000s' | tr ' ' 'x')
+    echo "[{\"subject_raw\":\"rule\",\"content\":\"$content\"}]" ;;
+  memory_preference_profile)
+    content=$(printf '%2000s' | tr ' ' 'y')
+    echo "[{\"subject_raw\":\"pref\",\"content\":\"$content\"}]" ;;
+  memory_search)
+    content=$(printf '%2000s' | tr ' ' 'z')
+    echo "[{\"subject_raw\":\"proj\",\"content\":\"$content\"}]" ;;
+  *) echo "unknown tool: $1" >&2; exit 1 ;;
+esac
+MOCK
+export NIGHTHAWK_MCP_CALL="$OVERSIZE_MOCK"
+out=$("${ROOT}/scripts/session-start.sh" < "${ROOT}/tests/fixtures/session-start.json")
+result=$(echo "$out" | jq -r '.hookSpecificOutput.additionalContext // ""')
+if [[ ${#result} -gt 4800 ]]; then
+  echo "FAIL: additionalContext exceeds 4800 chars (got ${#result})" >&2; exit 1
+fi
+export NIGHTHAWK_MCP_CALL="${ROOT}/tests/mock-mcp-call.sh"
+rm -f "$OVERSIZE_MOCK"
+
 echo "== UserPromptSubmit recall =="
 out=$("${ROOT}/scripts/recall.sh" < "${ROOT}/tests/fixtures/recall-prompt.json")
 echo "$out" | jq -e '.hookSpecificOutput.additionalContext | contains("vegetarian")' >/dev/null

@@ -23,14 +23,20 @@ cwd_basename=$(basename "${CLAUDE_PROJECT_DIR:-$(pwd)}")
 
 tmp_a=$(mktemp) tmp_u=$(mktemp) tmp_p=$(mktemp)
 
-(agent_brain_mcp_call retrieve_skills_for_context \
-  "$(jq -nc --arg c "agent:${NIGHTHAWK_AGENT_ID:-unknown}" '{context:$c}')" \
-  > "$tmp_a" 2>/dev/null) &
-(agent_brain_mcp_call memory_preference_profile '{}' \
-  > "$tmp_u" 2>/dev/null) &
-(agent_brain_mcp_call memory_search \
-  "$(jq -nc --arg q "$cwd_basename" '{query:$q,limit:6,use_graph:true}')" \
-  > "$tmp_p" 2>/dev/null) &
+(_TIER_BIN=$(agent_brain_resolve_mcp_call 2>/dev/null) && \
+  "$_TIER_BIN" retrieve_skills_for_context \
+    "$(jq -nc --arg c "agent:${NIGHTHAWK_AGENT_ID:-unknown}" '{context:$c}')" \
+  > "$tmp_a" 2>/dev/null &
+  _PID=$!; (sleep 8 && kill "$_PID" 2>/dev/null) & wait "$_PID" 2>/dev/null || true) &
+(_TIER_BIN=$(agent_brain_resolve_mcp_call 2>/dev/null) && \
+  "$_TIER_BIN" memory_preference_profile '{}' \
+  > "$tmp_u" 2>/dev/null &
+  _PID=$!; (sleep 8 && kill "$_PID" 2>/dev/null) & wait "$_PID" 2>/dev/null || true) &
+(_TIER_BIN=$(agent_brain_resolve_mcp_call 2>/dev/null) && \
+  "$_TIER_BIN" memory_search \
+    "$(jq -nc --arg q "$cwd_basename" '{query:$q,limit:6,use_graph:true}')" \
+  > "$tmp_p" 2>/dev/null &
+  _PID=$!; (sleep 8 && kill "$_PID" 2>/dev/null) & wait "$_PID" 2>/dev/null || true) &
 wait
 
 agent_brain_collect_subjects "$tmp_a" "$tmp_u" "$tmp_p"
