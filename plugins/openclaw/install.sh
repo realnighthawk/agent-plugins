@@ -71,33 +71,29 @@ ENV_FILE="${ENV_DIR}/openclaw.env"
 OPENCLAW_CONFIG="${HOME}/.openclaw/openclaw.json"
 mkdir -p "$ENV_DIR" "$(dirname "$OPENCLAW_CONFIG")"
 
-# Resolve plugin directory: local checkout or stable download location.
+# Resolve plugin directory: local checkout (dev) or git clone (remote).
 # OpenClaw's --link needs a stable on-disk path that persists after install.
+# Using git clone means re-running install.sh updates the plugin in place.
 resolve_plugin_dir() {
   if [[ -n "${LOCAL_CHECKOUT}" ]]; then
     echo "${LOCAL_CHECKOUT}/plugins/openclaw"
     return
   fi
 
-  local dest="${HOME}/.local/share/agent-brain/openclaw"
-  local tmpdir url
-  tmpdir=$(mktemp -d)
-  trap 'rm -rf "$tmpdir"' EXIT
+  local repo_dest="${HOME}/.local/share/agent-brain/agent-plugins"
+  local repo_url="https://github.com/${PLUGIN_GITHUB_REPO}.git"
 
-  if [[ "$AGENT_PLUGINS_REF" == v* ]]; then
-    url="https://github.com/${PLUGIN_GITHUB_REPO}/archive/refs/tags/${AGENT_PLUGINS_REF}.tar.gz"
+  if [[ -d "${repo_dest}/.git" ]]; then
+    echo "Updating agent-plugins repo at ${repo_dest}..." >&2
+    git -C "$repo_dest" fetch --depth=1 origin "${AGENT_PLUGINS_REF}" >&2
+    git -C "$repo_dest" checkout FETCH_HEAD >&2
   else
-    url="https://github.com/${PLUGIN_GITHUB_REPO}/archive/refs/heads/${AGENT_PLUGINS_REF}.tar.gz"
+    echo "Cloning agent-plugins repo to ${repo_dest}..." >&2
+    mkdir -p "$(dirname "$repo_dest")"
+    git clone --depth=1 --branch "${AGENT_PLUGINS_REF}" "$repo_url" "$repo_dest" >&2
   fi
 
-  echo "Fetching openclaw plugin files from GitHub..." >&2
-  curl -fsSL "$url" | tar -xz -C "$tmpdir"
-  local src
-  src="$(ls -d "$tmpdir"/*/plugins/openclaw)"
-
-  mkdir -p "$dest"
-  cp -R "$src/." "$dest/"
-  echo "$dest"
+  echo "${repo_dest}/plugins/openclaw"
 }
 
 # Install mcp-call binary to DEST.
