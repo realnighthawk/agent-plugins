@@ -9,41 +9,35 @@
 #
 # Or --project to install into the current repo's .cursor/ directory.
 #
-# Remote (no clone):
+# Remote (no clone needed):
 #   curl -fsSL https://raw.githubusercontent.com/realnighthawk/agent-plugins/main/plugins/cursor/install.sh | bash -s -- --global --api-key ...
 set -euo pipefail
 
-# Bootstrap repo root (curl | bash: no BASH_SOURCE — shallow-clone agent-plugins).
+PLUGIN_GITHUB_REPO="${AGENT_PLUGINS_GITHUB_REPO:-realnighthawk/agent-plugins}"
+AGENT_PLUGINS_REF="${AGENT_PLUGINS_REF:-main}"
+
+# Detect if running from a local checkout (dev workflow — enables go build fallback for mcp-call).
 _script_path="${BASH_SOURCE[0]:-}"
-ROOT=""
+LOCAL_CHECKOUT=""
 if [[ -n "${_script_path}" ]]; then
   _lib="$(cd "$(dirname "${_script_path}")/../.." 2>/dev/null && pwd)/scripts/lib/install-repo.sh"
   if [[ -f "${_lib}" ]]; then
     # shellcheck source=../../scripts/lib/install-repo.sh
     . "${_lib}"
-    ROOT="$(plugins_repo_root "${_script_path}")"
+    LOCAL_CHECKOUT="$(plugins_repo_root "${_script_path}")"
   fi
 fi
-if [[ -z "${ROOT}" ]]; then
-  _dest="${AGENT_PLUGINS_INSTALL_DIR:-${HOME}/.local/share/agent-plugins}"
-  _repo="${AGENT_PLUGINS_REPO:-https://github.com/realnighthawk/agent-plugins.git}"
-  _ref="${AGENT_PLUGINS_REF:-main}"
-  if [[ ! -f "${_dest}/go.mod" ]]; then
-    echo "agent-plugins: cloning to ${_dest} ..." >&2
-    mkdir -p "$(dirname "${_dest}")"
-    git clone --depth 1 --branch "${_ref}" "${_repo}" "${_dest}"
-  fi
-  ROOT="${_dest}"
-fi
+
 SCOPE="global"
 MCP_URL="https://agent-memory.nighthawklabs.org/sse"
 AGENT_ID=""
 API_KEY="${NIGHTHAWK_API_KEY:-}"
 JWT="${NIGHTHAWK_JWT:-}"
 USER_TAG="${USER:-you}"
+MCP_CALL_VERSION="${MCP_CALL_VERSION:-latest}"
 
 usage() {
-  sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,12p' "${BASH_SOURCE[0]:-$0}" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -64,8 +58,7 @@ done
 
 if [[ -z "$AGENT_ID" ]]; then
   if [[ "$SCOPE" == "project" ]]; then
-    base="$(basename "$ROOT")"
-    AGENT_ID="cursor-${USER_TAG}-${base}"
+    AGENT_ID="cursor-${USER_TAG}-$(basename "$PWD")"
   else
     AGENT_ID="cursor-${USER_TAG}"
   fi
@@ -80,20 +73,85 @@ if [[ "$SCOPE" == "global" ]]; then
   CURSOR_DIR="${HOME}/.cursor"
   HOOK_CMD_PREFIX="${CURSOR_DIR}/hooks"
 else
-  CURSOR_DIR="${ROOT}/.cursor"
+  CURSOR_DIR="${PWD}/.cursor"
   HOOK_CMD_PREFIX=".cursor/hooks"
 fi
 
 mkdir -p "${CURSOR_DIR}/bin" "${CURSOR_DIR}/hooks/lib" "${CURSOR_DIR}/state"
 
+# Fetch plugin files from local checkout or GitHub tarball.
+fetch_plugin_files() {
+  local src
+  if [[ -n "${LOCAL_CHECKOUT}" ]]; then
+    src="${LOCAL_CHECKOUT}/plugins/cursor"
+  else
+    local tmpdir url
+    tmpdir=$(mktemp -d)
+    trap 'rm -rf "$tmpdir"' EXIT
+
+    if [[ "$AGENT_PLUGINS_REF" == v* ]]; then
+      url="https://github.com/${PLUGIN_GITHUB_REPO}/archive/refs/tags/${AGENT_PLUGINS_REF}.tar.gz"
+    else
+      url="https://github.com/${PLUGIN_GITHUB_REPO}/archive/refs/heads/${AGENT_PLUGINS_REF}.tar.gz"
+    fi
+
+    echo "Fetching cursor plugin files from GitHub..."
+    curl -fsSL "$url" | tar -xz -C "$tmpdir"
+    src="$(ls -d "$tmpdir"/*/plugins/cursor)"
+  fi
+
+  cp -R "${src}/hooks/"*.sh "${CURSOR_DIR}/hooks/"
+  cp -R "${src}/hooks/lib/"*.sh "${CURSOR_DIR}/hooks/lib/"
+  chmod +x "${CURSOR_DIR}/hooks/"*.sh "${CURSOR_DIR}/hooks/lib/"*.sh
+}
+
+# Install mcp-call binary to DEST.
+# Local dev checkouts delegate to the full fetch script (supports go build fallback).
+# Remote installs download directly from GitHub releases.
+install_mcp_call() {
+  local dest="$1"
+  mkdir -p "$(dirname "$dest")"
+
+  if [[ -n "${LOCAL_CHECKOUT}" && -f "${LOCAL_CHECKOUT}/scripts/fetch-mcp-call.sh" ]]; then
+    export MCP_CALL_VERSION
+    "${LOCAL_CHECKOUT}/scripts/fetch-mcp-call.sh" "$dest"
+    return
+  fi
+
+  local os_name arch asset repo ver url tmp
+  case "$(uname -s)" in
+    Darwin) os_name=darwin ;;
+    Linux)  os_name=linux ;;
+    *) echo "unsupported OS: $(uname -s)" >&2; return 1 ;;
+  esac
+  case "$(uname -m)" in
+    x86_64|amd64) arch=amd64 ;;
+    arm64|aarch64) arch=arm64 ;;
+    *) echo "unsupported arch: $(uname -m)" >&2; return 1 ;;
+  esac
+
+  asset="mcp-call-${os_name}-${arch}"
+  repo="${NIGHTHAWK_MCP_CALL_REPO:-realnighthawk/agent-plugins}"
+  ver="${MCP_CALL_VERSION:-latest}"
+  if [[ -z "$ver" || "$ver" == "latest" ]]; then
+    url="https://github.com/${repo}/releases/latest/download/${asset}"
+  else
+    url="https://github.com/${repo}/releases/download/v${ver#v}/${asset}"
+  fi
+
+  tmp="${dest}.$$.tmp"
+  echo "Downloading mcp-call (${asset})..."
+  curl -fsSL "$url" -o "$tmp"
+  chmod +x "$tmp"
+  mv -f "$tmp" "$dest"
+  echo "Installed ${dest} from release"
+}
+
 echo "Installing mcp-call..."
-export MCP_CALL_VERSION="${MCP_CALL_VERSION:-latest}"
-"${ROOT}/scripts/fetch-mcp-call.sh" "${CURSOR_DIR}/bin/mcp-call"
+install_mcp_call "${CURSOR_DIR}/bin/mcp-call"
 
 echo "Copying hooks..."
-cp -R "${ROOT}/plugins/cursor/hooks/"*.sh "${CURSOR_DIR}/hooks/"
-cp -R "${ROOT}/plugins/cursor/hooks/lib/"*.sh "${CURSOR_DIR}/hooks/lib/"
-chmod +x "${CURSOR_DIR}/hooks/"*.sh "${CURSOR_DIR}/hooks/lib/"*.sh "${CURSOR_DIR}/bin/mcp-call"
+fetch_plugin_files
 
 ENV_FILE="${CURSOR_DIR}/agent-brain.env"
 cat >"$ENV_FILE" <<EOF
@@ -145,69 +203,50 @@ EOF
 
 # mcp.json — Cursor HTTP/SSE ignores envFile; ${NIGHTHAWK_*} is not expanded. Inline secrets at install.
 MCP_DEST="${CURSOR_DIR}/mcp.json"
-if command -v jq >/dev/null 2>&1; then
-  if [[ -n "$JWT" ]]; then
-    NEW_MCP="$(jq -n \
-      --arg url "$MCP_URL" \
-      --arg jwt "$JWT" \
-      --arg agent "$AGENT_ID" \
-      '{
-        mcpServers: {
-          "agent-brain": {
-            type: "http",
-            url: $url,
-            headers: {
-              Authorization: ("Bearer " + $jwt),
-              "X-Agent-ID": $agent
-            }
+if [[ -n "$JWT" ]]; then
+  NEW_MCP="$(jq -n \
+    --arg url "$MCP_URL" \
+    --arg jwt "$JWT" \
+    --arg agent "$AGENT_ID" \
+    '{
+      mcpServers: {
+        "agent-brain": {
+          type: "http",
+          url: $url,
+          headers: {
+            Authorization: ("Bearer " + $jwt),
+            "X-Agent-ID": $agent
           }
         }
-      }')"
-  else
-    NEW_MCP="$(jq -n \
-      --arg url "$MCP_URL" \
-      --arg key "$API_KEY" \
-      --arg agent "$AGENT_ID" \
-      '{
-        mcpServers: {
-          "agent-brain": {
-            type: "http",
-            url: $url,
-            headers: {
-              "X-API-Key": $key,
-              "X-Agent-ID": $agent
-            }
-          }
-        }
-      }')"
-  fi
-  if [[ -f "$MCP_DEST" ]]; then
-    jq -s '.[0].mcpServers["agent-brain"] = .[1].mcpServers["agent-brain"] | .[0]' \
-      "$MCP_DEST" <(echo "$NEW_MCP") >"${MCP_DEST}.tmp" && mv "${MCP_DEST}.tmp" "$MCP_DEST"
-    echo "Merged agent-brain into ${MCP_DEST} (credentials inlined for Cursor MCP)"
-  else
-    echo "$NEW_MCP" >"$MCP_DEST"
-    echo "Wrote ${MCP_DEST} (credentials inlined for Cursor MCP)"
-  fi
-  chmod 600 "$MCP_DEST" 2>/dev/null || true
+      }
+    }')"
 else
-  echo "warning: jq not found; writing mcp.json via sed (install jq for JWT installs)" >&2
-  NEW_MCP="$(mktemp)"
-  sed -e "s|__NIGHTHAWK_MCP_URL__|${MCP_URL}|g" \
-      -e "s|__NIGHTHAWK_API_KEY__|${API_KEY}|g" \
-      -e "s|__NIGHTHAWK_AGENT_ID__|${AGENT_ID}|g" \
-      "${ROOT}/plugins/cursor/templates/mcp.json" >"$NEW_MCP"
-  if [[ -f "$MCP_DEST" ]]; then
-    # Without jq we cannot merge; overwrite agent-brain entry only if user confirms manually
-    cp "$NEW_MCP" "${MCP_DEST}.agent-brain.new"
-    echo "Wrote ${MCP_DEST}.agent-brain.new — merge into ${MCP_DEST} manually"
-  else
-    cp "$NEW_MCP" "$MCP_DEST"
-    echo "Wrote ${MCP_DEST} (credentials inlined)"
-  fi
-  rm -f "$NEW_MCP"
-  chmod 600 "$MCP_DEST" 2>/dev/null || true
+  NEW_MCP="$(jq -n \
+    --arg url "$MCP_URL" \
+    --arg key "$API_KEY" \
+    --arg agent "$AGENT_ID" \
+    '{
+      mcpServers: {
+        "agent-brain": {
+          type: "http",
+          url: $url,
+          headers: {
+            "X-API-Key": $key,
+            "X-Agent-ID": $agent
+          }
+        }
+      }
+    }')"
 fi
+if [[ -f "$MCP_DEST" ]]; then
+  jq -s '.[0].mcpServers["agent-brain"] = .[1].mcpServers["agent-brain"] | .[0]' \
+    "$MCP_DEST" <(echo "$NEW_MCP") >"${MCP_DEST}.tmp" && mv "${MCP_DEST}.tmp" "$MCP_DEST"
+  echo "Merged agent-brain into ${MCP_DEST} (credentials inlined for Cursor MCP)"
+else
+  echo "$NEW_MCP" >"$MCP_DEST"
+  echo "Wrote ${MCP_DEST} (credentials inlined for Cursor MCP)"
+fi
+chmod 600 "$MCP_DEST"
 
 echo ""
 echo "Installed Agent Brain Cursor plugin (${SCOPE})"
