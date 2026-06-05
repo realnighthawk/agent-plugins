@@ -85,6 +85,26 @@ out=$("${ROOT}/scripts/recall.sh" < "${ROOT}/tests/fixtures/recall-prompt.json")
 echo "$out" | jq -e '.hookSpecificOutput.additionalContext | contains("vegetarian")' >/dev/null
 test -f "$PROMPT_FILE"
 
+echo "== Recall: excludes session subjects =="
+CALL_LOG=$(mktemp)
+export NIGHTHAWK_MOCK_CALL_LOG="$CALL_LOG"
+echo "communication" > "/tmp/agent-brain-subjects-agent-brain-abc123"
+"${ROOT}/scripts/recall.sh" < "${ROOT}/tests/fixtures/recall-prompt.json" >/dev/null
+grep -q 'exclude_subjects' "$CALL_LOG"
+rm -f "$CALL_LOG" "/tmp/agent-brain-subjects-agent-brain-abc123"
+unset NIGHTHAWK_MOCK_CALL_LOG
+
+echo "== Recall: no exclusion when subjects file absent =="
+CALL_LOG=$(mktemp)
+export NIGHTHAWK_MOCK_CALL_LOG="$CALL_LOG"
+rm -f "/tmp/agent-brain-subjects-agent-brain-abc123"
+"${ROOT}/scripts/recall.sh" < "${ROOT}/tests/fixtures/recall-prompt.json" >/dev/null
+if grep -q 'exclude_subjects' "$CALL_LOG"; then
+  echo "FAIL: exclude_subjects should not appear when subjects file absent" >&2; exit 1
+fi
+rm -f "$CALL_LOG"
+unset NIGHTHAWK_MOCK_CALL_LOG
+
 echo "== Stop index =="
 TMP="${TMPDIR:-/tmp}/agent-brain-cc-test-$$"
 mkdir -p "$TMP"

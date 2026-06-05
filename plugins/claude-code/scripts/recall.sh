@@ -19,8 +19,17 @@ sid=$(echo "$input" | jq -r '.session_id // empty')
 agent_brain_save_last_prompt "$prompt"
 
 query=$(printf '%s' "$prompt" | tr '\n' ' ' | head -c 500)
-args=$(jq -nc --arg q "$query" --argjson lim "${NIGHTHAWK_RECALL_LIMIT:-8}" \
-  '{query:$q, limit:$lim, use_graph:true}')
+
+subjects_file="/tmp/agent-brain-subjects-${NIGHTHAWK_SESSION_ID:-default}"
+if [[ -f "$subjects_file" && -s "$subjects_file" ]]; then
+  exclude=$(jq -Rsc 'split("\n") | map(select(length > 0))' < "$subjects_file")
+  args=$(jq -nc --arg q "$query" --argjson lim "${NIGHTHAWK_RECALL_LIMIT:-8}" \
+    --argjson excl "$exclude" \
+    '{query:$q, limit:$lim, use_graph:true, exclude_subjects:$excl}')
+else
+  args=$(jq -nc --arg q "$query" --argjson lim "${NIGHTHAWK_RECALL_LIMIT:-8}" \
+    '{query:$q, limit:$lim, use_graph:true}')
+fi
 
 block=""
 if result=$(agent_brain_mcp_call memory_search "$args" 2>/dev/null); then
