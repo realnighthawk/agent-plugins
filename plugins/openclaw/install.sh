@@ -157,23 +157,18 @@ else
   echo "export NIGHTHAWK_API_KEY=${API_KEY}" >>"$ENV_FILE"
 fi
 
-if [[ "$SKIP_PLUGIN_INSTALL" -eq 0 ]]; then
-  echo "Linking plugin with OpenClaw..."
-  openclaw plugins install --link "${PLUGIN_DIR}"
-fi
-
+# Write plugin config into openclaw.json BEFORE --link so OpenClaw's schema
+# validation passes (configSchema requires url). Do NOT pre-write
+# plugins.slots.memory — openclaw sets it automatically during install and
+# will reject it if the plugin isn't registered yet.
 merge_openclaw_config() {
-  local auth_key auth_val mcp_header_key mcp_header_val
+  local auth_key auth_val
   if [[ -n "$JWT" ]]; then
     auth_key="jwt"
     auth_val="$JWT"
-    mcp_header_key="Authorization"
-    mcp_header_val="Bearer ${JWT}"
   else
     auth_key="apiKey"
     auth_val="$API_KEY"
-    mcp_header_key="X-API-Key"
-    mcp_header_val="$API_KEY"
   fi
 
   local base='{}'
@@ -186,12 +181,8 @@ merge_openclaw_config() {
     --arg auth_key "$auth_key" \
     --arg auth_val "$auth_val" \
     --arg agent_id "$AGENT_ID" \
-    --arg mcp_header_key "$mcp_header_key" \
-    --arg mcp_header_val "$mcp_header_val" \
     '
     .plugins = (.plugins // {}) |
-    .plugins.slots = (.plugins.slots // {}) |
-    .plugins.slots.memory = "agent-brain" |
     .plugins.entries = (.plugins.entries // {}) |
     .plugins.entries["agent-brain"] = {
       enabled: true,
@@ -202,15 +193,6 @@ merge_openclaw_config() {
         autoCapture: true,
         recallLimit: 8
       } + (if $auth_key == "jwt" then {jwt: $auth_val} else {apiKey: $auth_val} end))
-    } |
-    .mcp = (.mcp // {}) |
-    .mcp["agent-brain"] = {
-      type: "streamable-http",
-      url: $url,
-      headers: ({
-        "X-Agent-ID": $agent_id,
-        "X-Session-ID": "openclaw-session"
-      } + (if $mcp_header_key == "Authorization" then {Authorization: $mcp_header_val} else {"X-API-Key": $mcp_header_val} end))
     }
     ' >"${OPENCLAW_CONFIG}.tmp" && mv "${OPENCLAW_CONFIG}.tmp" "$OPENCLAW_CONFIG"
 
@@ -218,6 +200,11 @@ merge_openclaw_config() {
 }
 
 merge_openclaw_config
+
+if [[ "$SKIP_PLUGIN_INSTALL" -eq 0 ]]; then
+  echo "Linking plugin with OpenClaw..."
+  openclaw plugins install --link "${PLUGIN_DIR}"
+fi
 
 if [[ "$RESTART_GATEWAY" -eq 1 ]]; then
   echo "Restarting OpenClaw gateway..."
