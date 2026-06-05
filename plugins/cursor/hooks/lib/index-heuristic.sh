@@ -14,7 +14,7 @@ agent_brain_index_candidates() {
     return 0
   fi
 
-  if echo "$user" | grep -qiE '\b(i prefer|i like|i hate|i always|i never|my goal is|i am allergic)\b'; then
+  if echo "$user" | grep -qiE '\b(i prefer|i like|i love|i hate|i always|i never|my goal is|i am allergic)\b'; then
     local subj
     subj=$(echo "$user" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g' | cut -c1-40)
     jq -nc --arg c "$user" --arg s "$subj" \

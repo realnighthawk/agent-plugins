@@ -98,6 +98,57 @@ else
   echo "export NIGHTHAWK_API_KEY=${API_KEY}" >>"$ENV_FILE"
 fi
 
+configure_claude_settings() {
+  local settings="${HOME}/.claude/settings.json"
+  mkdir -p "$(dirname "$settings")"
+  [[ -f "$settings" ]] || echo '{}' >"$settings"
+  python3 - "$settings" "$MCP_URL" "$AGENT_ID" "$API_KEY" "$JWT" <<'PY'
+import json, sys
+path, url, agent, api_key, jwt = sys.argv[1:6]
+with open(path) as f:
+    data = json.load(f)
+env = data.setdefault("env", {})
+env["NIGHTHAWK_MCP_URL"] = url
+env["NIGHTHAWK_AGENT_ID"] = agent
+if jwt:
+    env["NIGHTHAWK_JWT"] = jwt
+    env.pop("NIGHTHAWK_API_KEY", None)
+else:
+    env["NIGHTHAWK_API_KEY"] = api_key
+    env.pop("NIGHTHAWK_JWT", None)
+# Agent-brain plugin hooks replace legacy memory-* user hooks.
+hooks = data.get("hooks", {})
+for event in ("SessionStart", "Stop"):
+    entries = hooks.get(event, [])
+    filtered = []
+    for entry in entries:
+        inner = []
+        for h in entry.get("hooks", []):
+            cmd = h.get("command", "")
+            if "memory-session-start.sh" in cmd or "memory-stop.sh" in cmd:
+                continue
+            inner.append(h)
+        if inner:
+            entry = dict(entry)
+            entry["hooks"] = inner
+            filtered.append(entry)
+    if filtered:
+        hooks[event] = filtered
+    elif event in hooks:
+        del hooks[event]
+if hooks:
+    data["hooks"] = hooks
+elif "hooks" in data:
+    del data["hooks"]
+with open(path, "w") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+PY
+  echo "Updated Claude settings: ${settings} (NIGHTHAWK_* env; removed legacy memory-* hooks)"
+}
+
+configure_claude_settings
+
 register_claude_plugin() {
   local marketplace="${ROOT}/.claude-plugin/marketplace.json"
   if [[ ! -f "${marketplace}" ]]; then
@@ -134,13 +185,13 @@ echo "  Plugin path: ${PLUGIN_DIR}"
 echo "  MCP URL:     ${MCP_URL}"
 echo "  Agent ID:    ${AGENT_ID}"
 echo "  Env file:    ${ENV_FILE}"
+echo "  Claude env:  ~/.claude/settings.json (NIGHTHAWK_* injected for hooks + MCP)"
 echo ""
-echo "Add to your shell profile (~/.zshrc or ~/.bashrc):"
-echo "  source ${ENV_FILE}"
+echo "Optional: also source ${ENV_FILE} in your shell profile for CLI mcp-call."
 echo ""
 echo "Server checklist:"
-echo "  1. Memory Explorer → Settings: register agent \"${AGENT_ID}\""
+echo "  1. Memory Explorer → Settings: register agent \"${AGENT_ID}\" with write policy for user-stated facts"
 echo "  2. Restart Claude Code or run /reload-plugins"
 echo ""
-echo "Smoke test (after sourcing env):"
-echo "  ${PLUGIN_DIR}/bin/mcp-call memory_system_status '{}'"
+echo "Smoke test:"
+echo "  source ${ENV_FILE} && ${PLUGIN_DIR}/bin/mcp-call memory_system_status '{}'"

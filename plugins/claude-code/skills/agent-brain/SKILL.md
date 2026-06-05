@@ -5,7 +5,14 @@ description: Use when the task needs durable user facts, cross-session preferenc
 
 # Agent brain (Claude Code)
 
-Unified memory is provided by the **agent-brain** MCP server (hosted). This plugin wires **automatic recall** (`UserPromptSubmit` hook) and **indexing** (`Stop` hook).
+Unified memory is **only** in the hosted **agent-brain** MCP server. This plugin wires automatic recall (`UserPromptSubmit`) and indexing (`Stop`).
+
+## Hard rules
+
+1. **Never** save memory to Claude project files (`~/.claude/projects/.../memory/`), local markdown, or any filesystem fallback.
+2. **Never** invent an `agent_id` (email, username, etc.). The server uses `X-Agent-ID` from plugin auth (`NIGHTHAWK_AGENT_ID`, e.g. `claude-code-mac`). Omit `agent_id` in tool args when possible.
+3. If `memory_write` fails, **report the error** to the user. Do not silently store elsewhere.
+4. Do **not** use `memory.search`, `memory.write`, or `memory.close_session` — those are not agent-brain tools.
 
 ## When to use MCP tools directly
 
@@ -24,17 +31,17 @@ Hooks already run `memory_search` before each user prompt. Do not repeat the sam
 
 Every `memory_write` must include:
 
-- `agent_id` — your `NIGHTHAWK_AGENT_ID` (e.g. `claude-alice` or `claude-alice-myrepo`)
-- `session_id` — current session (hooks set `NIGHTHAWK_SESSION_ID`)
+- `session_id` — current Claude session id
 - `signal_type` — `user-stated`, `inferred`, `behavioral`, `tool-output`, `cron`, or `canonical`
 - `memory_type` — matching type (`stated_fact`, `inferred_fact`, etc.)
+- `content`, `subject` — self-contained fact text and short label
 
-Prefer `user-stated` only when the user explicitly said the fact. Use `inferred` for careful extractions. Cursor-tier agents typically cannot write `canonical` (server policy).
+Use `user-stated` when the user explicitly said the fact. If the server rejects `user-stated` (agent policy), tell the user to raise `max_signal_tier` in Memory Explorer → Settings — do not fall back to local storage.
 
 ## Compaction
 
-Memory context from hooks is re-fetched each turn. After compaction, rely on hooks + MCP search again — do not assume facts only exist in the visible transcript.
+Memory context from hooks is re-fetched each turn. After compaction, rely on hooks + MCP search again.
 
 ## Install / env
 
-See `plugins/claude-code/README.md`. Required: `NIGHTHAWK_MCP_URL`, `NIGHTHAWK_AGENT_ID`, and `NIGHTHAWK_API_KEY` or `NIGHTHAWK_JWT`.
+See `plugins/claude-code/README.md`. Required: `NIGHTHAWK_MCP_URL`, `NIGHTHAWK_AGENT_ID`, and `NIGHTHAWK_API_KEY` or `NIGHTHAWK_JWT` in `~/.claude/settings.json` env or sourced from `~/.config/agent-brain/claude.env`.

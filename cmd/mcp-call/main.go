@@ -72,14 +72,10 @@ func main() {
 
 func mergeEnvArgs(args map[string]any) {
 	if agent := os.Getenv("NIGHTHAWK_AGENT_ID"); agent != "" {
-		if _, ok := args["agent_id"]; !ok {
-			args["agent_id"] = agent
-		}
+		args["agent_id"] = agent
 	}
 	if session := os.Getenv("NIGHTHAWK_SESSION_ID"); session != "" {
-		if _, ok := args["session_id"]; !ok {
-			args["session_id"] = session
-		}
+		args["session_id"] = session
 	}
 }
 
