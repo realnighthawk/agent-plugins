@@ -13,6 +13,46 @@ rm -f "$PROMPT_FILE"
 echo "== SessionStart =="
 "${ROOT}/scripts/session-start.sh" < "${ROOT}/tests/fixtures/session-start.json" >/dev/null
 
+echo "== SessionStart: three tiers injected =="
+export NIGHTHAWK_AGENT_ID="test-agent"
+export CLAUDE_PROJECT_DIR="/tmp/test-project-$$"
+out=$("${ROOT}/scripts/session-start.sh" < "${ROOT}/tests/fixtures/session-start.json")
+echo "$out" | jq -e '.hookSpecificOutput.additionalContext | contains("Agent context")' >/dev/null
+echo "$out" | jq -e '.hookSpecificOutput.additionalContext | contains("Your profile")' >/dev/null
+echo "$out" | jq -e '.hookSpecificOutput.additionalContext | contains("Project context")' >/dev/null
+test -f "/tmp/agent-brain-subjects-agent-brain-abc123"
+
+echo "== SessionStart: empty tier omitted =="
+REAL_MOCK="${NIGHTHAWK_MCP_CALL}"
+EMPTY_MOCK=$(mktemp); chmod +x "$EMPTY_MOCK"
+cat > "$EMPTY_MOCK" <<'MOCK'
+#!/usr/bin/env bash
+case "${1:-}" in
+  memory_preference_profile) echo '{}' ;;
+  retrieve_skills_for_context) echo '{"content":"agent rules"}' ;;
+  memory_search) echo '[]' ;;
+  *) echo "unknown tool: $1" >&2; exit 1 ;;
+esac
+MOCK
+export NIGHTHAWK_MCP_CALL="$EMPTY_MOCK"
+out=$("${ROOT}/scripts/session-start.sh" < "${ROOT}/tests/fixtures/session-start.json")
+echo "$out" | jq -e '.hookSpecificOutput.additionalContext | contains("Agent context")' >/dev/null
+result=$(echo "$out" | jq -r '.hookSpecificOutput.additionalContext // ""')
+if echo "$result" | grep -q "Your profile"; then
+  echo "FAIL: empty user tier should be omitted" >&2; exit 1
+fi
+export NIGHTHAWK_MCP_CALL="$REAL_MOCK"
+rm -f "$EMPTY_MOCK"
+
+echo "== SessionStart: all tiers fail -> clean start =="
+FAIL_MOCK=$(mktemp); chmod +x "$FAIL_MOCK"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$FAIL_MOCK"
+export NIGHTHAWK_MCP_CALL="$FAIL_MOCK"
+out=$("${ROOT}/scripts/session-start.sh" < "${ROOT}/tests/fixtures/session-start.json")
+echo "$out" | jq -e '.hookSpecificOutput.hookEventName == "SessionStart"' >/dev/null
+export NIGHTHAWK_MCP_CALL="$REAL_MOCK"
+rm -f "$FAIL_MOCK"
+
 echo "== UserPromptSubmit recall =="
 out=$("${ROOT}/scripts/recall.sh" < "${ROOT}/tests/fixtures/recall-prompt.json")
 echo "$out" | jq -e '.hookSpecificOutput.additionalContext | contains("vegetarian")' >/dev/null

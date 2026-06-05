@@ -9,12 +9,12 @@ agent_brain_tier_text() {
   [[ ! -s "$file" ]] && return 0
   jq -r '
     if type == "string" then .
+    elif type == "array" then
+      map("- [" + (.subject_raw // .subject // "fact") + "] " + (.content // .text // "")) | join("\n")
     elif (.content // empty | type) == "string" then .content
     elif (.text // empty | type) == "string" then .text
     elif (.profile // empty | type) == "string" then .profile
     elif (.summary // empty | type) == "string" then .summary
-    elif type == "array" then
-      map("- [" + (.subject_raw // .subject // "fact") + "] " + (.content // .text // "")) | join("\n")
     elif (.memories // empty | type) == "array" then
       .memories | map("- [" + (.subject_raw // .subject // "fact") + "] " + (.content // .text // "")) | join("\n")
     elif (.preferences // empty | type) == "array" then
