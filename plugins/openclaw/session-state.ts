@@ -1,16 +1,10 @@
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
-
-function stateDir(): string {
-  return (
-    process.env.NIGHTHAWK_OPENCLAW_STATE ??
-    path.join(process.env.HOME ?? "/tmp", ".openclaw", "agent-brain-state")
-  );
-}
 
 function promptPath(sessionKey: string): string {
   const safe = sessionKey.replace(/[^a-zA-Z0-9._-]+/g, "_");
-  return path.join(stateDir(), `last-prompt-${safe}.txt`);
+  return path.join(os.tmpdir(), `agent-brain-prompt-${safe}.txt`);
 }
 
 export async function saveLastUserPrompt(
@@ -18,7 +12,6 @@ export async function saveLastUserPrompt(
   prompt: string,
 ): Promise<void> {
   if (!sessionKey || !prompt.trim()) return;
-  await fs.mkdir(stateDir(), { recursive: true });
   await fs.writeFile(promptPath(sessionKey), prompt, "utf8");
 }
 

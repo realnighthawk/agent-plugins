@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { formatRecallBlock, indexCandidates } from "../format.ts";
+import { saveLastUserPrompt, loadLastUserPrompt } from "../session-state.ts";
+import os from "node:os";
 
 describe("formatRecallBlock", () => {
   it("formats memory rows", () => {
@@ -26,5 +28,19 @@ describe("indexCandidates", () => {
 
   it("skips boilerplate", () => {
     assert.equal(indexCandidates("thanks", "").length, 0);
+  });
+});
+
+describe("session-state /tmp migration", () => {
+  it("saves and loads prompt from /tmp, not home dir", async () => {
+    const key = "test-session-" + Date.now();
+    await saveLastUserPrompt(key, "hello world");
+    const loaded = await loadLastUserPrompt(key);
+    assert.strictEqual(loaded, "hello world");
+    // Verify path is under /tmp (os.tmpdir())
+    const tmpdir = os.tmpdir();
+    const safe = key.replace(/[^a-zA-Z0-9._-]+/g, "_");
+    const { existsSync } = await import("node:fs");
+    assert.ok(existsSync(`${tmpdir}/agent-brain-prompt-${safe}.txt`));
   });
 });
