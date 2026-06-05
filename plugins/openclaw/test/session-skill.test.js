@@ -125,3 +125,46 @@ esac
     assert.ok(result.block.length <= 4800);
   });
 });
+
+// ---- Recall integration tests ----
+import { createRecallHook } from "../recall.ts";
+
+describe("createRecallHook with session skill", () => {
+  beforeEach(() => clearSessionSkillCache());
+
+  it("includes skill block in prependContext on first call", async () => {
+    const mockPath = writeMock(`
+case "$1" in
+  retrieve_skills_for_context) echo '{"content":"agent rules"}' ;;
+  memory_preference_profile) echo '[{"subject_raw":"diet","content":"vegetarian"}]' ;;
+  memory_search) echo '[{"subject_raw":"diet","content":"vegetarian","confidence":0.9}]' ;;
+esac
+`);
+    const cfg = makeMockCfg({ mcpCallPath: mockPath, recallMinPromptLength: 5 });
+    const api = { logger: { info: () => {}, warn: () => {} }, rootDir: undefined };
+    const hook = createRecallHook(api, cfg);
+    const result = await hook({ prompt: "what do you know?", sessionKey: "session-rc-1" });
+    unlinkSync(mockPath);
+    assert.ok(result.prependContext?.includes("## Agent context"), "skill block missing on first call");
+  });
+
+  it("omits skill block in prependContext on second call", async () => {
+    const mockPath = writeMock(`
+case "$1" in
+  retrieve_skills_for_context) echo '{"content":"agent rules"}' ;;
+  memory_preference_profile) echo '{}' ;;
+  memory_search) echo '[{"subject_raw":"diet","content":"vegetarian","confidence":0.9}]' ;;
+esac
+`);
+    const cfg = makeMockCfg({ mcpCallPath: mockPath, recallMinPromptLength: 5 });
+    const api = { logger: { info: () => {}, warn: () => {} }, rootDir: undefined };
+    const hook = createRecallHook(api, cfg);
+    await hook({ prompt: "first call", sessionKey: "session-rc-2" });
+    const result2 = await hook({ prompt: "second call", sessionKey: "session-rc-2" });
+    unlinkSync(mockPath);
+    assert.ok(
+      !result2.prependContext?.includes("## Agent context"),
+      "skill block should not repeat on second call",
+    );
+  });
+});
