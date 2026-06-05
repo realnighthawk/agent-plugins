@@ -8,10 +8,10 @@ source "${SCRIPT_DIR}/lib/index-heuristic.sh"
 
 input=$(cat)
 assistant=$(echo "$input" | jq -r '.last_assistant_message // empty' | head -c 8000)
+sid=$(echo "$input" | jq -r '.session_id // empty')
+[[ -n "$sid" ]] && export NIGHTHAWK_SESSION_ID="agent-brain-${sid}"
 user="$(agent_brain_load_last_prompt || true)"
-
-existing="$(agent_brain_load_session || true)"
-[[ -n "$existing" ]] && export NIGHTHAWK_SESSION_ID="$existing"
+rm -f "$(agent_brain_last_prompt_file)" 2>/dev/null || true
 
 candidates=$(agent_brain_index_candidates "$user" "$assistant")
 count=$(echo "$candidates" | jq 'length')

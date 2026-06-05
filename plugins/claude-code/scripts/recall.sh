@@ -13,10 +13,10 @@ if [[ -z "$prompt" ]]; then
   exit 0
 fi
 
-agent_brain_save_last_prompt "$prompt"
+sid=$(echo "$input" | jq -r '.session_id // empty')
+[[ -n "$sid" ]] && export NIGHTHAWK_SESSION_ID="agent-brain-${sid}"
 
-existing="$(agent_brain_load_session || true)"
-[[ -n "$existing" ]] && export NIGHTHAWK_SESSION_ID="$existing"
+agent_brain_save_last_prompt "$prompt"
 
 query=$(printf '%s' "$prompt" | tr '\n' ' ' | head -c 500)
 args=$(jq -nc --arg q "$query" --argjson lim "${NIGHTHAWK_RECALL_LIMIT:-8}" \

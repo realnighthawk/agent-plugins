@@ -8,14 +8,9 @@ input=$(cat)
 sid=$(echo "$input" | jq -r '.session_id // empty')
 
 if [[ -n "$sid" ]]; then
-  agent_brain_save_session "agent-brain-${sid}"
+  export NIGHTHAWK_SESSION_ID="agent-brain-${sid}"
 else
-  existing="$(agent_brain_load_session || true)"
-  if [[ -n "$existing" ]]; then
-    export NIGHTHAWK_SESSION_ID="$existing"
-  else
-    agent_brain_save_session "agent-brain-$(date +%s)-$$"
-  fi
+  export NIGHTHAWK_SESSION_ID="agent-brain-$(date +%s)-$$"
 fi
 
 if [[ -n "${NIGHTHAWK_MCP_URL:-}" ]]; then

@@ -16,7 +16,7 @@ mkdir -p "$CURSOR_PROJECT_DIR/.cursor/state"
 
 echo "== session-start =="
 "${ROOT}/hooks/session-start.sh" < "${ROOT}/tests/fixtures/session-start.json"
-test "$(cat "$CURSOR_PROJECT_DIR/.cursor/state/agent-brain-session-conv-abc-123")" = "cursor-conv-abc-123"
+test "$(cat "$CURSOR_PROJECT_DIR/.cursor/state/agent-brain-session")" = "cursor-conv-abc-123"
 
 echo "== recall =="
 out=$("${ROOT}/hooks/recall.sh" < "${ROOT}/tests/fixtures/recall-prompt.json")

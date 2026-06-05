@@ -1,42 +1,13 @@
 #!/usr/bin/env bash
 # Shared helpers for Agent Brain Claude Code plugin hooks.
 
-agent_brain_state_dir() {
-  if [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
-    echo "${CLAUDE_PLUGIN_DATA}/state"
-  elif [[ -n "${CLAUDE_PROJECT_DIR:-}" ]]; then
-    echo "${CLAUDE_PROJECT_DIR}/.claude/agent-brain-state"
-  else
-    echo "${HOME}/.claude/agent-brain-state"
-  fi
-}
-
-agent_brain_session_file() {
-  echo "$(agent_brain_state_dir)/agent-brain-session"
-}
-
 agent_brain_last_prompt_file() {
-  echo "$(agent_brain_state_dir)/last-user-prompt"
-}
-
-agent_brain_load_session() {
-  local f
-  f="$(agent_brain_session_file)"
-  if [[ -f "$f" ]]; then
-    cat "$f"
-  fi
-}
-
-agent_brain_save_session() {
-  local id="$1"
-  mkdir -p "$(agent_brain_state_dir)"
-  printf '%s' "$id" > "$(agent_brain_session_file)"
-  export NIGHTHAWK_SESSION_ID="$id"
+  local sid="${NIGHTHAWK_SESSION_ID:-default}"
+  echo "/tmp/agent-brain-prompt-${sid//\//-}"
 }
 
 agent_brain_save_last_prompt() {
   local text="$1"
-  mkdir -p "$(agent_brain_state_dir)"
   printf '%s' "$text" > "$(agent_brain_last_prompt_file)"
 }
 

@@ -7,25 +7,26 @@ export NIGHTHAWK_AGENT_ID=claude-test
 export NIGHTHAWK_API_KEY=test
 export NIGHTHAWK_RECALL_MAX=8
 export CLAUDE_PLUGIN_ROOT="$ROOT"
-export CLAUDE_PLUGIN_DATA="${TMPDIR:-/tmp}/agent-brain-cc-plugin-$$"
-
-mkdir -p "$CLAUDE_PLUGIN_DATA/state"
+PROMPT_FILE="/tmp/agent-brain-prompt-agent-brain-abc123"
+rm -f "$PROMPT_FILE"
 
 echo "== SessionStart =="
-out=$("${ROOT}/scripts/session-start.sh" < "${ROOT}/tests/fixtures/session-start.json")
-test "$(cat "$CLAUDE_PLUGIN_DATA/state/agent-brain-session")" = "agent-brain-abc123"
+"${ROOT}/scripts/session-start.sh" < "${ROOT}/tests/fixtures/session-start.json" >/dev/null
 
 echo "== UserPromptSubmit recall =="
 out=$("${ROOT}/scripts/recall.sh" < "${ROOT}/tests/fixtures/recall-prompt.json")
 echo "$out" | jq -e '.hookSpecificOutput.additionalContext | contains("vegetarian")' >/dev/null
-test -f "$CLAUDE_PLUGIN_DATA/state/last-user-prompt"
+test -f "$PROMPT_FILE"
 
 echo "== Stop index =="
-MARKER="${CLAUDE_PLUGIN_DATA}/index-called"
+TMP="${TMPDIR:-/tmp}/agent-brain-cc-test-$$"
+mkdir -p "$TMP"
+MARKER="${TMP}/index-called"
 export NIGHTHAWK_MOCK_INDEX_MARKER="$MARKER"
 rm -f "$MARKER"
 "${ROOT}/scripts/index.sh" < "${ROOT}/tests/fixtures/stop-turn.json"
 test -f "$MARKER"
+test ! -f "$PROMPT_FILE"
 
-rm -rf "$CLAUDE_PLUGIN_DATA"
+rm -rf "$TMP"
 echo "All Claude Code hook tests passed."
