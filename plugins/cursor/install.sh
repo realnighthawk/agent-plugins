@@ -87,7 +87,7 @@ fetch_plugin_files() {
   else
     local tmpdir url
     tmpdir=$(mktemp -d)
-    trap 'rm -rf "$tmpdir"' EXIT
+    trap 'rm -rf "$tmpdir"' RETURN
 
     if [[ "$AGENT_PLUGINS_REF" == v* ]]; then
       url="https://github.com/${PLUGIN_GITHUB_REPO}/archive/refs/tags/${AGENT_PLUGINS_REF}.tar.gz"
