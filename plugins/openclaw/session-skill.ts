@@ -69,10 +69,12 @@ function buildBlock(tiers: TierEntry[]): { block: string; subjects: string[] } {
     subjects.push(...extractSubjects(tier.raw));
     if (!text) continue;
     const section = `${tier.header}\n${text}`;
-    const remaining = MAX_TOTAL_CHARS - totalChars;
+    // Account for "\n\n" separator that join() will add between sections
+    const separatorCost = sections.length > 0 ? 2 : 0;
+    const remaining = MAX_TOTAL_CHARS - totalChars - separatorCost;
     if (remaining <= tier.header.length + 20) break;
     sections.push(section.length > remaining ? section.slice(0, remaining) : section);
-    totalChars += section.length;
+    totalChars += section.length + separatorCost;
   }
 
   return { block: sections.join("\n\n"), subjects };
