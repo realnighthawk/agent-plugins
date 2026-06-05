@@ -46,7 +46,7 @@ tmp_p=$(mktemp)
 trap 'rm -f "${tmp_a:-}" "${tmp_u:-}" "${tmp_p:-}"' EXIT
 
 (_run_with_timeout 8 agent_brain_mcp_call retrieve_skills_for_context \
-  "$(jq -nc --arg c "agent:${NIGHTHAWK_AGENT_ID:-unknown}" '{context:$c}')" \
+  "$(jq -nc --arg aid "${NIGHTHAWK_AGENT_ID:-unknown}" --arg q "agent session context" '{agent_id:$aid,query:$q}')" \
   > "$tmp_a" 2>/dev/null) &
 (_run_with_timeout 8 agent_brain_mcp_call memory_preference_profile '{}' \
   > "$tmp_u" 2>/dev/null) &

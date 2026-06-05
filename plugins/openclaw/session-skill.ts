@@ -14,7 +14,7 @@ function extractTierText(raw: string): string {
     if (typeof parsed === "string") return parsed;
     if (parsed !== null && typeof parsed === "object") {
       const p = parsed as Record<string, unknown>;
-      for (const key of ["content", "text", "profile", "summary"]) {
+      for (const key of ["content", "Body", "text", "profile", "summary"]) {
         if (typeof p[key] === "string") return p[key] as string;
       }
       const items = Array.isArray(parsed)
@@ -27,8 +27,8 @@ function extractTierText(raw: string): string {
       if (items) {
         return items
           .map((m) => {
-            const subj = String(m.subject_raw ?? m.subject ?? "fact");
-            const content = String(m.content ?? m.text ?? m.value ?? "");
+            const subj = String(m.subject_raw ?? m.subject ?? m.Name ?? "fact");
+            const content = String(m.content ?? m.text ?? m.Body ?? m.value ?? "");
             return `- [${subj}] ${content}`;
           })
           .join("\n");
@@ -99,7 +99,7 @@ export async function getSessionSkill(
       cfg,
       rootDir,
       "retrieve_skills_for_context",
-      { context: `agent:${cfg.agentId ?? cfg.agentPrefix}` },
+      { agent_id: cfg.agentId ?? cfg.agentPrefix ?? "unknown", query: "agent session context" },
       sessionKey,
     ),
     callMcpTool(cfg, rootDir, "memory_preference_profile", {}, sessionKey),

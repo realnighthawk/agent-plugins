@@ -10,8 +10,9 @@ agent_brain_tier_text() {
   jq -r '
     if type == "string" then .
     elif type == "array" then
-      map("- [" + (.subject_raw // .subject // "fact") + "] " + (.content // .text // "")) | join("\n")
+      map("- [" + (.subject_raw // .subject // .Name // "fact") + "] " + (.content // .text // .Body // "")) | join("\n")
     elif (.content // empty | type) == "string" then .content
+    elif (.Body // empty | type) == "string" then .Body
     elif (.text // empty | type) == "string" then .text
     elif (.profile // empty | type) == "string" then .profile
     elif (.summary // empty | type) == "string" then .summary
