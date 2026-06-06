@@ -27,7 +27,7 @@ if [[ -n "${_script_path}" ]]; then
   fi
 fi
 
-MCP_URL="https://agent-memory.nighthawklabs.org/sse"
+MCP_URL="https://agent-memory.nighthawklabs.org/mcp"
 AGENT_ID=""
 API_KEY="${NIGHTHAWK_API_KEY:-}"
 JWT="${NIGHTHAWK_JWT:-}"

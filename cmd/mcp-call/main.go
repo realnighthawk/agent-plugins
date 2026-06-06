@@ -1,5 +1,5 @@
-// mcp-call invokes a single tool on a hosted agent-brain SSE MCP endpoint.
-// Used by Cursor plugin hooks; not part of the server build.
+// mcp-call invokes a single tool on a hosted agent-brain MCP endpoint.
+// Uses Streamable HTTP transport. Used by plugin hooks; not part of the server build.
 package main
 
 import (
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	mcpclient "github.com/mark3labs/mcp-go/client"
+	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -40,7 +41,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	defer cancel()
 
-	c, err := mcpclient.NewSSEMCPClient(url, mcpclient.WithHeaders(headers))
+	c, err := mcpclient.NewStreamableHttpClient(url, transport.WithHTTPHeaders(headers))
 	if err != nil {
 		fatal(err)
 	}

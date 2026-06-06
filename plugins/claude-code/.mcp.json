@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "agent-brain": {
-      "type": "sse",
+      "type": "http",
       "url": "${NIGHTHAWK_MCP_URL}",
       "headers": {
         "X-API-Key": "${NIGHTHAWK_API_KEY}",

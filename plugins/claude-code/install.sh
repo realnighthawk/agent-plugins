@@ -25,7 +25,7 @@ if [[ -n "${_script_path}" ]]; then
   fi
 fi
 
-MCP_URL="https://agent-memory.nighthawklabs.org/sse"
+MCP_URL="https://agent-memory.nighthawklabs.org/mcp"
 AGENT_ID=""
 API_KEY="${NIGHTHAWK_API_KEY:-}"
 JWT="${NIGHTHAWK_JWT:-}"
@@ -222,14 +222,14 @@ write_mcp_config() {
       --arg url "$MCP_URL" \
       --arg jwt "$JWT" \
       --arg agent_id "$AGENT_ID" \
-      '{"mcpServers":{"agent-brain":{"type":"sse","url":$url,"headers":{"Authorization":("Bearer "+$jwt),"X-Agent-ID":$agent_id}}}}' \
+      '{"mcpServers":{"agent-brain":{"type":"http","url":$url,"headers":{"Authorization":("Bearer "+$jwt),"X-Agent-ID":$agent_id}}}}' \
       > "$mcp_file"
   else
     jq -n \
       --arg url "$MCP_URL" \
       --arg api_key "$API_KEY" \
       --arg agent_id "$AGENT_ID" \
-      '{"mcpServers":{"agent-brain":{"type":"sse","url":$url,"headers":{"X-API-Key":$api_key,"X-Agent-ID":$agent_id}}}}' \
+      '{"mcpServers":{"agent-brain":{"type":"http","url":$url,"headers":{"X-API-Key":$api_key,"X-Agent-ID":$agent_id}}}}' \
       > "$mcp_file"
   fi
   chmod 600 "$mcp_file"
