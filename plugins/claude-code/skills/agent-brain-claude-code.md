@@ -32,9 +32,10 @@ Skip a category if nothing genuinely new emerged for it this turn.
   - 0.65–0.75 if inferred from behavior or implicit context
   - skip if uncertain / speculative
 
-**Category 5 → set_intention:**
+**Category 5 → set_intention / complete_intention:**
 
-- content: what to do
+- If the user deferred something: set_intention(content, topic)
+- If the user completed a previously deferred task this session: complete_intention(intention_id)
 - topic: short label for the deferred task
 
 ## PROJECT SKILLS — when user codifies a reusable rule:

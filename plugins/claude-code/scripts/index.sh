@@ -10,7 +10,7 @@ sid=$(echo "$input" | jq -r '.session_id // empty')
 rm -f "$(agent_brain_last_prompt_file)" 2>/dev/null || true
 
 # Complete intentions that were triggered (and acted on) during this session.
-# IDs are written by recall.sh whenever check_intentions returns triggered status.
+# IDs are written by recall.sh / session-start.sh whenever check_intentions returns triggered status.
 triggered_file="/tmp/agent-brain-triggered-intentions-${NIGHTHAWK_SESSION_ID:-default}"
 if [[ -f "$triggered_file" && -s "$triggered_file" ]]; then
   while IFS= read -r intention_id; do

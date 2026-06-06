@@ -6,7 +6,6 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
 agent_brain_load_env || true
 
-input=$(cat)
 existing="$(agent_brain_load_session || true)"
 [[ -n "$existing" ]] && export NIGHTHAWK_SESSION_ID="$existing"
 
