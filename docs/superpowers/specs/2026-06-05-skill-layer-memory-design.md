@@ -59,8 +59,7 @@ SessionStart
     │
     ▼
   Stop
-    ├─ complete_intention for each triggered ID in state file → delete file
-    └─ index heuristic → route candidates to memory_write / set_intention
+    └─ complete_intention for each triggered ID in state file → delete file
 ```
 
 Cross-agent consistency falls out naturally: user and project tiers are read from the server, shared across all agents on the same API key.
@@ -73,10 +72,9 @@ Cross-agent consistency falls out naturally: user and project tiers are read fro
 
 - **`scripts/session-start.sh`** — four parallel fetches (three skill tiers + `check_intentions`); emits merged block + `## Pending intentions` section as `additionalContext`; appends triggered intention IDs to `/tmp/agent-brain-triggered-intentions-<sid>`
 - **`scripts/recall.sh`** — two parallel fetches (`memory_search` with `exclude_subjects` + `check_intentions`); merges both blocks into `additionalContext`; appends triggered IDs to state file
-- **`scripts/index.sh`** — three phases at Stop: (1) read state file, call `complete_intention` per ID, delete file; (2) run `agent_brain_index_candidates`; (3) route each candidate by `.action`: `set_intention` or `memory_write`
+- **`scripts/index.sh`** — Completion-only: reads triggered-intentions file → complete_intention per ID → deletes file. No new writes.
 - **`scripts/lib/session-skill.sh`** *(new)* — shared merge logic: truncate each tier, concatenate with section headers, enforce token cap
 - **`scripts/lib/format-recall.sh`** — added `agent_brain_format_intentions` alongside existing `agent_brain_format_recall`
-- **`scripts/lib/index-heuristic.sh`** — expanded to 5 tiers; Tier 5 detects deferred phrases and returns `{action:"set_intention", content, topic}` instead of a `memory_write` candidate
 - **`scripts/ingest-skills.sh`** *(new)* — standalone re-ingest script; reads all `.md` files in `skills/` and calls `ingest_skill` for each
 - **`install.sh`** — calls `ingest_agent_skills()` after mcp-call installation; adds re-ingest hint to output
 - **`skills/agent-brain-claude-code.md`** *(new)* — agent-tier skill body (~1400 chars); contains after-each-response write/intention protocol (see below); ingested to server at install time
@@ -139,22 +137,10 @@ Cross-agent consistency falls out naturally: user and project tiers are read fro
 
 ### Session end (Stop / agent_end)
 
-Three phases run sequentially:
-
-**Phase 1 — Complete triggered intentions:**
+**Complete triggered intentions:**
 - Read `/tmp/agent-brain-triggered-intentions-<sid>`
 - Call `complete_intention(intention_id)` for each ID (intentions acted on during session)
 - Delete state file
-
-**Phase 2 — Run index heuristic:**
-- `lib/index-heuristic.sh` scans last user prompt for 5 tiers of signals
-- Returns JSON candidate array; each item has optional `.action` field
-
-**Phase 3 — Route candidates:**
-- `.action == "set_intention"` → `set_intention(content, topic)` (Tier 5: deferred phrases; safety net for when Plane 2 agent didn't catch it mid-session)
-- `.action` absent or other → `memory_write(...)` (Tiers 1–4: preferences, corrections, constraints, decisions)
-
-Project-scoped `memory_write` subjects surface in the next session's project tier automatically.
 
 ### Intentions state file lifecycle
 
@@ -165,24 +151,27 @@ Project-scoped `memory_write` subjects surface in the next session's project tie
 | Stop: complete_intention phase | Read file, call API per line, `rm -f` |
 | Session never reaches Stop (crash, kill) | File left in `/tmp`; harmless; cleaned by OS |
 
-### After-each-response protocol (Plane 2 — agent tier)
+### After-each-response protocol (agent tier — two-phase)
 
-The agent-tier skill (`skills/agent-brain-claude-code.md`) gives Claude an explicit protocol to run after every response. This is the primary capture path for mid-session facts; the Stop hook is the safety net.
+The agent-tier skill gives Claude an explicit two-phase protocol to run after every response. This is the primary capture path for mid-session facts; the Stop hook handles intention completion only.
 
-**Write triggers** (agent calls `memory_write` immediately):
-- User stated a preference: "I prefer X", "I always Y", "I never Z"
-- User made a correction: "no", "not that", "actually X", "wrong", "instead"
-- User stated a project constraint: "in this repo", "our convention is", "we always/don't use"
-- User revealed a fact: name, role, tech stack, goal, team, deadline
-- Architectural decision confirmed: "let's go with X", "we decided", "use X approach"
+**Phase 1 — Reflect:** Ask what emerged in this conversation turn that future-you wouldn't know from reading the code or git history. Use the full conversation context. List candidates before writing any.
 
-**Write protocol:**
-1. Call `memory_get(subject="<label>")` first — skip write if fact unchanged
-2. Call `memory_write` with `signal_type`, `memory_type`, `subject`, `content`, `confidence`
+**Phase 2 — Category Audit (backstop):** For each category below, if Phase 1 did not already produce a candidate, check explicitly:
+1. **Preference** — did the user state or confirm how they like things done?
+2. **Correction** — did the user push back, say you were wrong, or redirect?
+3. **Project constraint** — did a deadline, policy, convention, or scope limit emerge?
+4. **Architectural decision** — was a design choice, technology, or pattern decided or confirmed?
+5. **Deferred intention** — was something identified as "do later", "follow up", or "remind me"?
 
-**Intention triggers** (agent calls `set_intention` immediately):
-- "remind me", "later", "I'll do X", "follow up on X" → `set_intention(content, topic)`
-- Deferred task completed this session → `complete_intention(intention_id)`
+**Write protocol — Categories 1–4 → `memory_write`:**
+- `signal_type`: "user-stated" (explicit) | "inferred" (observed pattern)
+- `memory_type`: "stated_fact" | "inferred_fact"
+- `subject`: short canonical label derived from context; never include dates or raw message text
+- `content`: self-contained fact sentence, not a raw quote
+- `confidence`: 0.90–0.95 explicit, 0.80–0.85 confirmed, 0.65–0.75 inferred; skip if speculative
+
+**Category 5 → `set_intention`:** content + topic (short label for the deferred task)
 
 **Skill triggers** (agent calls `ingest_skill`):
 - User codifies a reusable project rule → `ingest_skill(name, body, description)`
@@ -242,9 +231,6 @@ Extend `mock-mcp-call.sh` to handle `retrieve_skills_for_context` with static fi
 | Recall fallback when session subjects empty | `memory_search` args have no `exclude_subjects` |
 | Recall calls check_intentions in parallel | Both `memory_search` and `check_intentions` MCP calls appear in mock log |
 | Stop completes triggered intentions | `complete_intention` called for each ID in state file; file deleted |
-| Stop routes set_intention candidates | `set_intention` called (not `memory_write`) for Tier 5 candidates |
-| Stop routes memory_write candidates | `memory_write` called for Tiers 1–4 candidates |
-| index-heuristic Tier 5 detection | "remind me to X" returns `{action:"set_intention", topic:"X"}` |
 
 ### OpenClaw (TypeScript)
 
