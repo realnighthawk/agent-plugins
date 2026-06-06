@@ -5,7 +5,8 @@
 #   ./plugins/openclaw/install.sh \
 #     --url https://agent-memory.nighthawklabs.org/sse \
 #     --agent-id openclaw-you \
-#     --api-key YOUR_KEY
+#     --api-key YOUR_KEY \
+#     [--config-file ~/.openclaw/openclaw.gemini.json]
 #
 # Remote (no clone needed):
 #   curl -fsSL https://raw.githubusercontent.com/realnighthawk/agent-plugins/main/plugins/openclaw/install.sh | bash -s -- --api-key ...
@@ -35,6 +36,7 @@ AGENT_PREFIX="openclaw"
 MCP_CALL_VERSION="${MCP_CALL_VERSION:-latest}"
 SKIP_PLUGIN_INSTALL=0
 RESTART_GATEWAY=0
+EXTRA_CONFIG_FILE=""
 
 usage() {
   sed -n '2,11p' "${BASH_SOURCE[0]:-$0}" | sed 's/^# \{0,1\}//'
@@ -50,6 +52,7 @@ while [[ $# -gt 0 ]]; do
     --user) USER_TAG="$2"; shift 2 ;;
     --agent-prefix) AGENT_PREFIX="$2"; shift 2 ;;
     --version) MCP_CALL_VERSION="$2"; shift 2 ;;
+    --config-file) EXTRA_CONFIG_FILE="$2"; shift 2 ;;
     --skip-plugin-install) SKIP_PLUGIN_INSTALL=1; shift ;;
     --restart) RESTART_GATEWAY=1; shift ;;
     -h|--help) usage 0 ;;
@@ -162,6 +165,7 @@ fi
 # plugins.slots.memory — openclaw sets it automatically during install and
 # will reject it if the plugin isn't registered yet.
 merge_openclaw_config() {
+  local target_file="$1"
   local auth_key auth_val
   if [[ -n "$JWT" ]]; then
     auth_key="jwt"
@@ -172,8 +176,8 @@ merge_openclaw_config() {
   fi
 
   local base='{}'
-  if [[ -f "$OPENCLAW_CONFIG" ]]; then
-    base="$(cat "$OPENCLAW_CONFIG")"
+  if [[ -f "$target_file" ]]; then
+    base="$(cat "$target_file")"
   fi
 
   echo "$base" | jq \
@@ -194,12 +198,20 @@ merge_openclaw_config() {
         recallLimit: 8
       } + (if $auth_key == "jwt" then {jwt: $auth_val} else {apiKey: $auth_val} end))
     }
-    ' >"${OPENCLAW_CONFIG}.tmp" && mv "${OPENCLAW_CONFIG}.tmp" "$OPENCLAW_CONFIG"
+    ' >"${target_file}.tmp" && mv "${target_file}.tmp" "$target_file"
 
-  echo "Updated ${OPENCLAW_CONFIG}"
+  echo "Updated ${target_file}"
 }
 
-merge_openclaw_config
+merge_openclaw_config "$OPENCLAW_CONFIG"
+
+if [[ -n "$EXTRA_CONFIG_FILE" ]]; then
+  if [[ ! -f "$EXTRA_CONFIG_FILE" ]]; then
+    echo "Error: --config-file path does not exist: ${EXTRA_CONFIG_FILE}" >&2
+    exit 1
+  fi
+  merge_openclaw_config "$EXTRA_CONFIG_FILE"
+fi
 
 if [[ "$SKIP_PLUGIN_INSTALL" -eq 0 ]]; then
   echo "Linking plugin with OpenClaw..."
@@ -218,6 +230,9 @@ echo "  MCP URL:     ${MCP_URL}"
 echo "  Agent ID:    ${AGENT_ID}"
 echo "  Env file:    ${ENV_FILE}"
 echo "  Config:      ${OPENCLAW_CONFIG}"
+if [[ -n "$EXTRA_CONFIG_FILE" ]]; then
+  echo "  Extra config: ${EXTRA_CONFIG_FILE}"
+fi
 echo ""
 echo "Optional: source ${ENV_FILE} in your shell for env-based overrides."
 echo ""
