@@ -1,26 +1,41 @@
 # Cursor Memory Protocol
 
-After EVERY response, run this check before your next action.
+After EVERY response, before your next action, run the two-phase memory check.
 
-## WRITE TRIGGERS — call memory_write NOW if any occurred:
-- User stated a preference: "I prefer X", "I always Y", "I never Z", "I want X"
-- User made a correction: "no", "not that", "actually X", "wrong", "instead"
-- User stated a constraint: "in this project/repo", "we always", "we don't use", "our convention is"
-- User revealed a fact: name, role, tech stack, goal, team, deadline
-- Architectural decision confirmed: "let's go with X", "we decided", "use X approach"
+## Phase 1 — Reflect
 
-## WRITE PROTOCOL:
-1. Call memory_get(subject="<label>") first — skip write if fact already exists unchanged
-2. Call memory_write:
-   - signal_type: "user-stated" (explicit) | "inferred" (observed pattern, conf 0.65–0.75)
-   - memory_type: "stated_fact" | "inferred_fact" | "structured_artifact"
-   - subject: short canonical label — "user.coding.style", "project.stack", "user.goal.X"
-   - content: self-contained fact sentence, not a raw quote
-   - confidence: 0.95 user-stated, 0.70 inferred
+Ask yourself: what emerged in this conversation turn that future-you wouldn't know from reading the code or git history? Use the full conversation context — not just the last exchange. List candidates before writing any.
 
-## INTENTIONS — handle immediately, not at session end:
-- "remind me", "later", "I'll do X tomorrow", "follow up on X" → set_intention(content, topic)
-- Deferred task completed this session → complete_intention(intention_id)
+## Phase 2 — Category Audit (backstop)
+
+For each category below, if Phase 1 did not already produce a candidate for it, check explicitly:
+
+1. **Preference** — did the user state or confirm how they like things done? ("I prefer X", "I always Y", "I never Z")
+2. **Correction** — did the user push back, say you were wrong, or redirect your approach?
+3. **Project constraint** — did a deadline, policy, convention, or scope limit emerge?
+4. **Architectural decision** — was a design choice, technology, or pattern decided or confirmed?
+5. **Deferred intention** — was something identified as "do later", "follow up", or "remind me"?
+
+Skip a category if nothing genuinely new emerged for it this turn.
+
+## Write Protocol
+
+**Categories 1–4 → memory_write:**
+
+- signal_type: "user-stated" (explicit) | "inferred" (observed pattern)
+- memory_type: "stated_fact" | "inferred_fact"
+- subject: short canonical label derived from context — "testing-approach", "auth-middleware", "deploy-policy". Never include dates or raw message text.
+- content: self-contained fact sentence, not a raw quote
+- confidence:
+  - 0.90–0.95 if user stated explicitly ("I prefer…", "we decided…")
+  - 0.80–0.85 if user confirmed when asked
+  - 0.65–0.75 if inferred from behavior or implicit context
+  - skip if uncertain / speculative
+
+**Category 5 → set_intention:**
+
+- content: what to do
+- topic: short label for the deferred task
 
 ## PROJECT SKILLS — when user codifies a reusable rule:
 - "always use X pattern in this repo", project convention → ingest_skill(name, body, description)
