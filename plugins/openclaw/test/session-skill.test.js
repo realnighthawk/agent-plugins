@@ -74,6 +74,20 @@ esac
     assert.ok(!result.block.includes("## Project context"));
   });
 
+  it("does not throw when mcp-call returns null JSON", async () => {
+    const { getSessionSkill } = await import("../session-skill.ts");
+    const mockPath = writeMock(`echo 'null'`);
+    const result = await getSessionSkill(
+      makeMockCfg({ mcpCallPath: mockPath }),
+      undefined,
+      "session-null",
+      "my-project",
+    );
+    unlinkSync(mockPath);
+    assert.strictEqual(result.block, "");
+    assert.deepStrictEqual(result.subjects, []);
+  });
+
   it("returns empty block when all tiers fail", async () => {
     const { getSessionSkill } = await import("../session-skill.ts");
     const mockPath = writeMock("exit 1");

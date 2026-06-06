@@ -44,6 +44,7 @@ function extractSubjects(raw: string): string[] {
   if (!raw.trim()) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
+    if (parsed === null || typeof parsed !== "object") return [];
     const items = Array.isArray(parsed)
       ? (parsed as Record<string, unknown>[])
       : (parsed as Record<string, unknown>).memories
