@@ -13,3 +13,17 @@ agent_brain_format_recall() {
   fi
   printf '%s\n%s' "## Memory context (agent-brain)" "$lines"
 }
+
+agent_brain_format_intentions() {
+  local json="$1"
+  local lines
+  lines=$(echo "$json" | jq -r '
+    (if type == "array" then . elif .intentions then .intentions else [] end)[]
+    | select(.status == "pending" or .status == "triggered")
+    | "- [intention: \(.topic // "task")] \(.content)"
+  ' 2>/dev/null) || return 1
+  if [[ -z "$lines" ]]; then
+    return 0
+  fi
+  printf '%s\n%s' "## Pending intentions" "$lines"
+}

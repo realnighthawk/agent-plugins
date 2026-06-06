@@ -1,8 +1,14 @@
 import path from "node:path";
 import type { AgentBrainPluginConfig } from "./config.js";
 import { callMcpTool } from "./client.js";
-import { formatRecallBlock, type MemoryRow } from "./format.js";
-import { saveLastUserPrompt } from "./session-state.js";
+import { resolveAgentId } from "./config.js";
+import {
+  formatRecallBlock,
+  formatIntentionsBlock,
+  extractTriggeredIds,
+  type MemoryRow,
+} from "./format.js";
+import { saveLastUserPrompt, appendTriggeredIntentionIds } from "./session-state.js";
 import { getSessionSkill } from "./session-skill.js";
 
 export type PluginApi = {
@@ -50,25 +56,43 @@ export function createRecallHook(api: PluginApi, cfg: AgentBrainPluginConfig) {
       recallArgs.exclude_subjects = subjects;
     }
 
+    const intentionsArgs = {
+      agent_id: resolveAgentId(cfg, ctx.sessionKey),
+      context_text: query,
+    };
+
+    const [recallRes, intentionsRes] = await Promise.allSettled([
+      callMcpTool(cfg, api.rootDir, "memory_search", recallArgs, ctx.sessionKey),
+      callMcpTool(cfg, api.rootDir, "check_intentions", intentionsArgs, ctx.sessionKey),
+    ]);
+
     let recallBlock = "";
-    try {
-      const raw = await callMcpTool(cfg, api.rootDir, "memory_search", recallArgs, ctx.sessionKey);
-      let parsed: MemoryRow[] | { memories?: MemoryRow[] } | null;
+    if (recallRes.status === "fulfilled") {
       try {
-        parsed = JSON.parse(raw) as MemoryRow[] | { memories?: MemoryRow[] };
+        const parsed = JSON.parse(recallRes.value) as MemoryRow[] | { memories?: MemoryRow[] };
+        const rows = Array.isArray(parsed) ? parsed : (parsed?.memories ?? []);
+        recallBlock = formatRecallBlock(rows, cfg.recallLimit) ?? "";
       } catch {
         api.logger.warn("agent-brain: invalid memory_search JSON");
-        parsed = [];
       }
-      const rows = Array.isArray(parsed) ? parsed : (parsed?.memories ?? []);
-      recallBlock = formatRecallBlock(rows, cfg.recallLimit) ?? "";
-    } catch (err) {
-      api.logger.warn(`agent-brain: recall failed: ${String(err)}`);
+    } else {
+      api.logger.warn(`agent-brain: recall failed: ${String(recallRes.reason)}`);
+    }
+
+    let intentionsBlock = "";
+    if (intentionsRes.status === "fulfilled") {
+      const raw = intentionsRes.value;
+      const triggeredIds = extractTriggeredIds(raw);
+      if (triggeredIds.length > 0) {
+        await appendTriggeredIntentionIds(ctx.sessionKey, triggeredIds).catch(() => {});
+      }
+      intentionsBlock = formatIntentionsBlock(raw);
     }
 
     const parts: string[] = [];
     if (firstCall && skillBlock) parts.push(skillBlock);
     if (recallBlock) parts.push(recallBlock);
+    if (intentionsBlock) parts.push(intentionsBlock);
 
     if (parts.length === 0) return {};
     return { prependContext: parts.join("\n\n") };

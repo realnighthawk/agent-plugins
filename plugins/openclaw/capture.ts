@@ -1,8 +1,9 @@
 import type { AgentBrainPluginConfig } from "./config.js";
 import { callMcpTool } from "./client.js";
+import { resolveAgentId } from "./config.js";
 import { indexCandidates } from "./format.js";
 import type { PluginApi } from "./recall.js";
-import { loadLastUserPrompt } from "./session-state.js";
+import { loadLastUserPrompt, loadAndClearTriggeredIntentionIds } from "./session-state.js";
 
 export type AgentEndCtx = {
   sessionKey?: string;
@@ -30,6 +31,25 @@ export function createCaptureHook(api: PluginApi, cfg: AgentBrainPluginConfig) {
     if (ctx.trigger === "memory") return {};
     if (ctx.sessionKey?.includes(":memory-capture:")) return {};
 
+    const agentId = resolveAgentId(cfg, ctx.sessionKey);
+
+    // Phase 1: complete intentions that were triggered (and acted on) during this session.
+    const triggeredIds = await loadAndClearTriggeredIntentionIds(ctx.sessionKey);
+    for (const id of triggeredIds) {
+      try {
+        await callMcpTool(
+          cfg,
+          api.rootDir,
+          "complete_intention",
+          { agent_id: agentId, intention_id: id },
+          ctx.sessionKey,
+        );
+      } catch (err) {
+        api.logger.warn(`agent-brain: complete_intention failed: ${String(err)}`);
+      }
+    }
+
+    // Phase 2: run index heuristic and route candidates.
     const { user: msgUser, assistant } = lastExchange(ctx);
     const user = msgUser || (await loadLastUserPrompt(ctx.sessionKey));
     const candidates = indexCandidates(user, assistant);
@@ -37,8 +57,20 @@ export function createCaptureHook(api: PluginApi, cfg: AgentBrainPluginConfig) {
 
     for (const row of candidates) {
       try {
-        const args: Record<string, unknown> = { ...row };
-        await callMcpTool(cfg, api.rootDir, "memory_write", args, ctx.sessionKey);
+        if (row.action === "set_intention") {
+          await callMcpTool(
+            cfg,
+            api.rootDir,
+            "set_intention",
+            { agent_id: agentId, content: row.content, topic: row.topic ?? "" },
+            ctx.sessionKey,
+          );
+        } else {
+          const args: Record<string, unknown> = { ...row };
+          delete args.action;
+          delete args.topic;
+          await callMcpTool(cfg, api.rootDir, "memory_write", args, ctx.sessionKey);
+        }
       } catch (err) {
         api.logger.warn(`agent-brain: capture write failed: ${String(err)}`);
       }

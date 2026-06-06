@@ -215,6 +215,43 @@ fi
 echo "Installing mcp-call..."
 install_mcp_call "${PLUGIN_DIR}/bin/mcp-call"
 
+ingest_agent_skills() {
+  local skills_dir="${PLUGIN_DIR}/skills"
+  [[ -d "$skills_dir" ]] || return 0
+  local bin="${PLUGIN_DIR}/bin/mcp-call"
+  [[ -x "$bin" ]] || return 0
+
+  local ok=0 fail=0
+  for skill_file in "${skills_dir}"/*.md; do
+    [[ -f "$skill_file" ]] || continue
+    local name body description args
+    name=$(basename "$skill_file" .md)
+    body=$(cat "$skill_file")
+    description=$(head -n1 "$skill_file" | sed 's/^#[[:space:]]*//')
+    if [[ -n "$JWT" ]]; then
+      args=$(jq -nc \
+        --arg aid "$AGENT_ID" --arg name "$name" \
+        --arg body "$body" --arg desc "$description" \
+        '{agent_id:$aid,name:$name,body:$body,description:$desc}')
+      NIGHTHAWK_JWT="$JWT" NIGHTHAWK_MCP_URL="$MCP_URL" \
+        NIGHTHAWK_AGENT_ID="$AGENT_ID" NIGHTHAWK_MCP_CALL="$bin" \
+        "$bin" ingest_skill "$args" >/dev/null 2>&1 && ok=$(( ok+1 )) || fail=$(( fail+1 ))
+    else
+      args=$(jq -nc \
+        --arg aid "$AGENT_ID" --arg name "$name" \
+        --arg body "$body" --arg desc "$description" \
+        '{agent_id:$aid,name:$name,body:$body,description:$desc}')
+      NIGHTHAWK_API_KEY="$API_KEY" NIGHTHAWK_MCP_URL="$MCP_URL" \
+        NIGHTHAWK_AGENT_ID="$AGENT_ID" NIGHTHAWK_MCP_CALL="$bin" \
+        "$bin" ingest_skill "$args" >/dev/null 2>&1 && ok=$(( ok+1 )) || fail=$(( fail+1 ))
+    fi
+  done
+  echo "Agent skills ingested: ${ok} ok, ${fail} failed"
+}
+
+echo "Ingesting agent-tier skills..."
+ingest_agent_skills
+
 write_mcp_config() {
   local mcp_file="${PLUGIN_DIR}/.mcp.json"
   if [[ -n "$JWT" ]]; then
@@ -248,6 +285,7 @@ echo "  Claude env:  ~/.claude/settings.json (NIGHTHAWK_* injected for hooks)"
 echo "  MCP config:  ${PLUGIN_DIR}/.mcp.json (credentials written directly)"
 echo ""
 echo "Optional: source ${ENV_FILE} in your shell profile for CLI mcp-call usage."
+echo "Re-ingest skills after updates: source ${ENV_FILE} && ${PLUGIN_DIR}/scripts/ingest-skills.sh"
 echo ""
 echo "Server checklist:"
 echo "  1. Memory Explorer → Settings: register agent \"${AGENT_ID}\" with write policy for user-stated facts"

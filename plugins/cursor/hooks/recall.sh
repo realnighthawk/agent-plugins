@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# beforeSubmitPrompt: memory_search → inject context via additional_context.
+# beforeSubmitPrompt: memory_search + check_intentions → inject context via additional_context.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib/common.sh
@@ -31,22 +31,55 @@ query=$(printf '%s' "$prompt" | tr '\n' ' ' | head -c 500)
 subjects_file="/tmp/agent-brain-subjects-${NIGHTHAWK_SESSION_ID:-default}"
 if [[ -f "$subjects_file" && -s "$subjects_file" ]]; then
   exclude=$(jq -Rsc 'split("\n") | map(select(length > 0))' < "$subjects_file")
-  args=$(jq -nc --arg q "$query" --argjson lim "${NIGHTHAWK_RECALL_LIMIT:-8}" \
+  recall_args=$(jq -nc --arg q "$query" --argjson lim "${NIGHTHAWK_RECALL_LIMIT:-8}" \
     --argjson excl "$exclude" \
     '{query:$q, limit:$lim, use_graph:true, exclude_subjects:$excl}')
 else
-  args=$(jq -nc --arg q "$query" --argjson lim "${NIGHTHAWK_RECALL_LIMIT:-8}" \
+  recall_args=$(jq -nc --arg q "$query" --argjson lim "${NIGHTHAWK_RECALL_LIMIT:-8}" \
     '{query:$q, limit:$lim, use_graph:true}')
 fi
 
+intentions_args=$(jq -nc \
+  --arg aid "${NIGHTHAWK_AGENT_ID:-}" \
+  --arg ctx "$query" \
+  '{agent_id:$aid, context_text:$ctx}')
+
+tmp_r=$(mktemp)
+tmp_i=$(mktemp)
+trap 'rm -f "${tmp_r:-}" "${tmp_i:-}"' EXIT
+
+(agent_brain_mcp_call memory_search "$recall_args" > "$tmp_r" 2>/dev/null) &
+(agent_brain_mcp_call check_intentions "$intentions_args" > "$tmp_i" 2>/dev/null) &
+wait
+
 recall_block=""
-if result=$(agent_brain_mcp_call memory_search "$args" 2>/dev/null); then
-  recall_block=$(agent_brain_format_recall "$result" || true)
+if [[ -s "$tmp_r" ]]; then
+  recall_block=$(agent_brain_format_recall "$(cat "$tmp_r")" || true)
+fi
+
+intentions_block=""
+if [[ -s "$tmp_i" ]]; then
+  # Save triggered intention IDs so afterAgentResponse can complete them.
+  triggered_ids=$(jq -r '
+    (if type == "array" then . elif .intentions then .intentions else [] end)[]
+    | select(.status == "triggered")
+    | .id // .ID // empty
+  ' "$tmp_i" 2>/dev/null | grep -v '^$' || true)
+  if [[ -n "$triggered_ids" ]]; then
+    triggered_file="/tmp/agent-brain-triggered-intentions-${NIGHTHAWK_SESSION_ID:-default}"
+    printf '%s\n' "$triggered_ids" >> "$triggered_file"
+  fi
+
+  intentions_block=$(agent_brain_format_intentions "$(cat "$tmp_i")" || true)
 fi
 
 combined=""
 [[ -n "$skill_block" ]] && combined+="$skill_block"$'\n\n'
 [[ -n "$recall_block" ]] && combined+="$recall_block"
+if [[ -n "$intentions_block" ]]; then
+  [[ -n "$combined" ]] && combined+=$'\n\n'
+  combined+="$intentions_block"
+fi
 
 if [[ -z "$combined" ]]; then
   echo '{}'

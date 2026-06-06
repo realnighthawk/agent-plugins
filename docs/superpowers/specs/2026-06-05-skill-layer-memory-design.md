@@ -1,7 +1,7 @@
 # Skill-Layer Memory Backend — Design Spec
 
 **Date:** 2026-06-05
-**Status:** Approved for implementation
+**Status:** Implemented
 **Scope:** Claude Code, Cursor, OpenClaw plugins + agent-brain server-side skills
 
 ---
@@ -40,17 +40,27 @@ SessionStart
     │
     ├─ retrieve_skills_for_context("agent:<agent_id>")   → Agent tier
     ├─ memory_preference_profile({})                      → User tier
-    └─ memory_search({query:<cwd_basename>})              → Project tier
+    ├─ memory_search({query:<cwd_basename>})              → Project tier
+    └─ check_intentions({context_text:"session start <cwd>"})  → Pending intentions
     │
     ▼
   merge + enforce 1200-token cap
+  + append ## Pending intentions section
+  + save triggered intention IDs to /tmp/agent-brain-triggered-intentions-<sid>
     │
     ▼
   inject once as session context
     │
     ▼
-  Per-turn recall (targeted, excludes session subjects)
-    → smaller recall blocks per turn
+  Per-turn recall (UserPromptSubmit)
+    ├─ memory_search (excludes session subjects) → recall block
+    └─ check_intentions (context=prompt)         → intentions block
+    → merged additionalContext; triggered IDs appended to state file
+    │
+    ▼
+  Stop
+    ├─ complete_intention for each triggered ID in state file → delete file
+    └─ index heuristic → route candidates to memory_write / set_intention
 ```
 
 Cross-agent consistency falls out naturally: user and project tiers are read from the server, shared across all agents on the same API key.
@@ -61,10 +71,16 @@ Cross-agent consistency falls out naturally: user and project tiers are read fro
 
 ### Claude Code (`plugins/claude-code`)
 
-- **`scripts/session-start.sh`** — replace discarded `memory_preference_profile` call with three parallel tier fetches; emit merged block as `additionalContext`
-- **`scripts/recall.sh`** — pass `exclude_subjects` list (set during session-start) to `memory_search` to avoid re-injecting tier-covered facts
+- **`scripts/session-start.sh`** — four parallel fetches (three skill tiers + `check_intentions`); emits merged block + `## Pending intentions` section as `additionalContext`; appends triggered intention IDs to `/tmp/agent-brain-triggered-intentions-<sid>`
+- **`scripts/recall.sh`** — two parallel fetches (`memory_search` with `exclude_subjects` + `check_intentions`); merges both blocks into `additionalContext`; appends triggered IDs to state file
+- **`scripts/index.sh`** — three phases at Stop: (1) read state file, call `complete_intention` per ID, delete file; (2) run `agent_brain_index_candidates`; (3) route each candidate by `.action`: `set_intention` or `memory_write`
 - **`scripts/lib/session-skill.sh`** *(new)* — shared merge logic: truncate each tier, concatenate with section headers, enforce token cap
-- **`skills/agent-brain/SKILL.md`** — removed; agent-tier skill content migrated to server-side via `ingest_skill`
+- **`scripts/lib/format-recall.sh`** — added `agent_brain_format_intentions` alongside existing `agent_brain_format_recall`
+- **`scripts/lib/index-heuristic.sh`** — expanded to 5 tiers; Tier 5 detects deferred phrases and returns `{action:"set_intention", content, topic}` instead of a `memory_write` candidate
+- **`scripts/ingest-skills.sh`** *(new)* — standalone re-ingest script; reads all `.md` files in `skills/` and calls `ingest_skill` for each
+- **`install.sh`** — calls `ingest_agent_skills()` after mcp-call installation; adds re-ingest hint to output
+- **`skills/agent-brain-claude-code.md`** *(new)* — agent-tier skill body (~1400 chars); contains after-each-response write/intention protocol (see below); ingested to server at install time
+- **`skills/agent-brain/SKILL.md`** — removed; agent-tier skill content is now server-side only
 
 ### Cursor (`plugins/cursor`)
 
@@ -96,26 +112,83 @@ Cross-agent consistency falls out naturally: user and project tiers are read fro
 ### Session start (once per session)
 
 1. Set `NIGHTHAWK_SESSION_ID` from payload (no file write)
-2. Fetch all three tiers in parallel with 8s per-tier timeout
-3. Merge:
+2. Fetch four calls in parallel with 8s per-fetch timeout:
+   - `retrieve_skills_for_context` → Agent tier
+   - `memory_preference_profile` → User tier
+   - `memory_search(query=cwd_basename, limit=6, use_graph=true)` → Project tier
+   - `check_intentions(context_text="session start <cwd>")` → Pending intentions
+3. Merge skill tiers:
    - Truncate each tier to ~400 tokens (~1600 chars)
    - Skip empty tiers silently (no placeholders)
    - Concatenate with headers: `## Agent context`, `## Your profile`, `## Project context`
    - Hard cap: 1200 tokens (~4800 chars total); truncate project tier first if over
-4. Emit merged block as `additionalContext` (Claude Code/Cursor) or `prependContext` (OpenClaw)
-5. Write injected subject labels to `/tmp/agent-brain-subjects-${NIGHTHAWK_SESSION_ID}` (one per line) for recall exclusion — same `/tmp` pattern as the prompt file; shell env vars don't survive across separate hook process invocations
+4. If `check_intentions` returned pending/triggered intentions, call `agent_brain_format_intentions` and append `## Pending intentions` section to block
+5. Emit merged block as `additionalContext` (Claude Code/Cursor) or `prependContext` (OpenClaw)
+6. Write injected subject labels to `/tmp/agent-brain-subjects-${NIGHTHAWK_SESSION_ID}` (one per line) for recall exclusion
+7. If any intentions were `triggered`, append their IDs (one per line) to `/tmp/agent-brain-triggered-intentions-${NIGHTHAWK_SESSION_ID}`
 
 ### Per-turn recall (every user prompt)
 
-1. Read subject labels from `/tmp/agent-brain-subjects-${NIGHTHAWK_SESSION_ID}` if it exists
-2. Run `memory_search` with `exclude_subjects: [<session subjects>]`
-3. Inject result as before — typically 2–4 items instead of 6–8
-4. If subjects file is absent (session-start failed or new session), fall back to current behavior with no exclusion
+1. Save prompt to state file for Stop
+2. Run two calls in parallel:
+   - `memory_search` with `exclude_subjects` from subjects file (omit if file absent — fallback to no exclusion)
+   - `check_intentions(context_text=<prompt>)` — detects topic/time matches against pending intentions
+3. Format recall block from `memory_search` result; format intentions block from `check_intentions` result
+4. If `check_intentions` returned triggered intentions, append their IDs to `/tmp/agent-brain-triggered-intentions-<sid>` (append, not overwrite — accumulates across turns)
+5. Merge blocks; inject as `additionalContext` — typically 2–4 recall items + any matching intentions
 
 ### Session end (Stop / agent_end)
 
-- Index heuristic runs unchanged
-- No additional changes in this pass; project-scoped `memory_write` subjects automatically surface in next session's project tier
+Three phases run sequentially:
+
+**Phase 1 — Complete triggered intentions:**
+- Read `/tmp/agent-brain-triggered-intentions-<sid>`
+- Call `complete_intention(intention_id)` for each ID (intentions acted on during session)
+- Delete state file
+
+**Phase 2 — Run index heuristic:**
+- `lib/index-heuristic.sh` scans last user prompt for 5 tiers of signals
+- Returns JSON candidate array; each item has optional `.action` field
+
+**Phase 3 — Route candidates:**
+- `.action == "set_intention"` → `set_intention(content, topic)` (Tier 5: deferred phrases; safety net for when Plane 2 agent didn't catch it mid-session)
+- `.action` absent or other → `memory_write(...)` (Tiers 1–4: preferences, corrections, constraints, decisions)
+
+Project-scoped `memory_write` subjects surface in the next session's project tier automatically.
+
+### Intentions state file lifecycle
+
+| Event | File operation |
+|-------|---------------|
+| SessionStart: `check_intentions` returns triggered IDs | `>> /tmp/agent-brain-triggered-intentions-<sid>` |
+| UserPromptSubmit: `check_intentions` returns triggered IDs | `>> /tmp/agent-brain-triggered-intentions-<sid>` |
+| Stop: complete_intention phase | Read file, call API per line, `rm -f` |
+| Session never reaches Stop (crash, kill) | File left in `/tmp`; harmless; cleaned by OS |
+
+### After-each-response protocol (Plane 2 — agent tier)
+
+The agent-tier skill (`skills/agent-brain-claude-code.md`) gives Claude an explicit protocol to run after every response. This is the primary capture path for mid-session facts; the Stop hook is the safety net.
+
+**Write triggers** (agent calls `memory_write` immediately):
+- User stated a preference: "I prefer X", "I always Y", "I never Z"
+- User made a correction: "no", "not that", "actually X", "wrong", "instead"
+- User stated a project constraint: "in this repo", "our convention is", "we always/don't use"
+- User revealed a fact: name, role, tech stack, goal, team, deadline
+- Architectural decision confirmed: "let's go with X", "we decided", "use X approach"
+
+**Write protocol:**
+1. Call `memory_get(subject="<label>")` first — skip write if fact unchanged
+2. Call `memory_write` with `signal_type`, `memory_type`, `subject`, `content`, `confidence`
+
+**Intention triggers** (agent calls `set_intention` immediately):
+- "remind me", "later", "I'll do X", "follow up on X" → `set_intention(content, topic)`
+- Deferred task completed this session → `complete_intention(intention_id)`
+
+**Skill triggers** (agent calls `ingest_skill`):
+- User codifies a reusable project rule → `ingest_skill(name, body, description)`
+- Used for agent instructions, NOT preference facts
+
+**Do not write:** routine code edits, file reads, "ok"/"thanks"/"looks good", facts already in recalled context that have not changed.
 
 ### Subject propagation
 
@@ -160,11 +233,18 @@ Extend `mock-mcp-call.sh` to handle `retrieve_skills_for_context` with static fi
 | Test | Assertion |
 |------|-----------|
 | Session start injects all three tiers | `additionalContext` contains all three headers |
+| Session start injects pending intentions | `additionalContext` contains `## Pending intentions` when fixture returns pending items |
+| Session start triggered IDs written to state file | `/tmp/agent-brain-triggered-intentions-<sid>` contains IDs from fixture |
 | Session start with empty user tier | Only agent + project headers present |
 | All tiers fail | Hook exits 0, `additionalContext` absent or empty |
 | Token cap enforced | Output ≤ 4800 chars when fixtures are oversized |
 | Recall excludes session subjects | `memory_search` args contain `exclude_subjects` |
 | Recall fallback when session subjects empty | `memory_search` args have no `exclude_subjects` |
+| Recall calls check_intentions in parallel | Both `memory_search` and `check_intentions` MCP calls appear in mock log |
+| Stop completes triggered intentions | `complete_intention` called for each ID in state file; file deleted |
+| Stop routes set_intention candidates | `set_intention` called (not `memory_write`) for Tier 5 candidates |
+| Stop routes memory_write candidates | `memory_write` called for Tiers 1–4 candidates |
+| index-heuristic Tier 5 detection | "remind me to X" returns `{action:"set_intention", topic:"X"}` |
 
 ### OpenClaw (TypeScript)
 
