@@ -53,15 +53,15 @@ export function createRecallHook(api: PluginApi, cfg: AgentBrainPluginConfig) {
     let recallBlock = "";
     try {
       const raw = await callMcpTool(cfg, api.rootDir, "memory_search", recallArgs, ctx.sessionKey);
-      let parsed: MemoryRow[] | { memories?: MemoryRow[] };
+      let parsed: MemoryRow[] | { memories?: MemoryRow[] } | null;
       try {
         parsed = JSON.parse(raw) as MemoryRow[] | { memories?: MemoryRow[] };
       } catch {
         api.logger.warn("agent-brain: invalid memory_search JSON");
         parsed = [];
       }
-      recallBlock =
-        formatRecallBlock(Array.isArray(parsed) ? parsed : (parsed.memories ?? []), cfg.recallLimit) ?? "";
+      const rows = Array.isArray(parsed) ? parsed : (parsed?.memories ?? []);
+      recallBlock = formatRecallBlock(rows, cfg.recallLimit) ?? "";
     } catch (err) {
       api.logger.warn(`agent-brain: recall failed: ${String(err)}`);
     }
