@@ -21,7 +21,8 @@ const defaults = {
 
 export function parseConfig(raw: Record<string, unknown> | undefined): AgentBrainPluginConfig {
   const c = raw ?? {};
-  const url = String(c.url ?? process.env.NIGHTHAWK_MCP_URL ?? "").trim();
+  const rawUrl = String(c.url ?? "").trim();
+  const url = (rawUrl && !rawUrl.startsWith("${") ? rawUrl : process.env.NIGHTHAWK_MCP_URL ?? "");
   if (!url) {
     throw new Error("agent-brain: plugins.entries.agent-brain.config.url (or NIGHTHAWK_MCP_URL) is required");
   }
@@ -30,7 +31,7 @@ export function parseConfig(raw: Record<string, unknown> | undefined): AgentBrai
     apiKey: pickString(c.apiKey, process.env.NIGHTHAWK_API_KEY),
     jwt: pickString(c.jwt, process.env.NIGHTHAWK_JWT),
     agentId: pickString(c.agentId, process.env.NIGHTHAWK_AGENT_ID),
-    agentPrefix: String(c.agentPrefix ?? process.env.NIGHTHAWK_AGENT_PREFIX ?? defaults.agentPrefix),
+    agentPrefix: pickString(c.agentPrefix, process.env.NIGHTHAWK_AGENT_PREFIX) ?? defaults.agentPrefix,
     autoRecall: bool(c.autoRecall, defaults.autoRecall),
     autoCapture: bool(c.autoCapture, defaults.autoCapture),
     recallLimit: num(c.recallLimit, defaults.recallLimit),
@@ -41,7 +42,10 @@ export function parseConfig(raw: Record<string, unknown> | undefined): AgentBrai
 
 function pickString(...vals: (unknown | undefined)[]): string | undefined {
   for (const v of vals) {
-    if (typeof v === "string" && v.trim()) return v.trim();
+    if (typeof v === "string") {
+      const s = v.trim();
+      if (s && !s.startsWith("${")) return s;
+    }
   }
   return undefined;
 }
