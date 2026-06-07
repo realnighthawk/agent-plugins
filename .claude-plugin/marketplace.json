@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "agent-brain",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "source": "./plugins/claude-code",
       "description": "Unified long-term memory via hosted agent-brain MCP (auto recall + index hooks).",
       "homepage": "https://github.com/realnighthawk/agent-plugins",
