@@ -1,6 +1,6 @@
 {
-  "name": "@realnighthawk/agent-brain-openclaw",
-  "version": "0.1.2",
+  "name": "agent-brain",
+  "version": "0.1.3",
   "description": "AgentBrain unified memory for OpenClaw (hosted MCP + lifecycle hooks)",
   "type": "module",
   "license": "MIT",
