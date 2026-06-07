@@ -209,6 +209,8 @@ merge_openclaw_config() {
   fi
 
   echo "$base" | jq \
+    --arg url "$MCP_URL" \
+    --arg agent_id "$AGENT_ID" \
     --arg auth_key "$auth_key" \
     '
     .plugins = (.plugins // {}) |
@@ -216,8 +218,8 @@ merge_openclaw_config() {
     .plugins.entries["agent-brain"] = {
       enabled: true,
       config: ({
-        url: "${NIGHTHAWK_MCP_URL}",
-        agentId: "${NIGHTHAWK_AGENT_ID}",
+        url: $url,
+        agentId: $agent_id,
         autoRecall: true,
         autoCapture: true,
         recallLimit: 8
