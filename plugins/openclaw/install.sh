@@ -196,11 +196,13 @@ fi
 # will reject it if the plugin isn't registered yet.
 merge_openclaw_config() {
   local target_file="$1"
-  local auth_key
+  local auth_key auth_val
   if [[ -n "$JWT" ]]; then
     auth_key="jwt"
+    auth_val="$JWT"
   else
     auth_key="apiKey"
+    auth_val="$API_KEY"
   fi
 
   local base='{}'
@@ -212,6 +214,7 @@ merge_openclaw_config() {
     --arg url "$MCP_URL" \
     --arg agent_id "$AGENT_ID" \
     --arg auth_key "$auth_key" \
+    --arg auth_val "$auth_val" \
     '
     .plugins = (.plugins // {}) |
     .plugins.entries = (.plugins.entries // {}) |
@@ -223,7 +226,7 @@ merge_openclaw_config() {
         autoRecall: true,
         autoCapture: true,
         recallLimit: 8
-      } + (if $auth_key == "jwt" then {jwt: "${NIGHTHAWK_JWT}"} else {apiKey: "${NIGHTHAWK_API_KEY}"} end))
+      } + (if $auth_key == "jwt" then {jwt: $auth_val} else {apiKey: $auth_val} end))
     }
     ' >"${target_file}.tmp" && mv "${target_file}.tmp" "$target_file"
 
