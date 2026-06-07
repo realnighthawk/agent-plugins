@@ -12,23 +12,19 @@ Before starting substantial work — or when the user's request may match a stor
 
 Do not skip agent-brain and go straight to native skills when a tenant skill may apply.
 
-After EVERY response, before your next action, run the two-phase memory check.
+## After responding
 
-## Phase 1 — Reflect
+Once your main response is complete, scan the full exchange — the user's message AND your response together — for memory signals. Write all detected signals before ending your turn; do not defer to a later turn.
 
-Ask yourself: what emerged in this conversation turn that future-you wouldn't know from reading the code or git history? Use the full conversation context — not just the last exchange. List candidates before writing any.
+| Signal | Write |
+|--------|-------|
+| Stated preference ("I prefer / I always / I never / I want X done Y way") | `memory_write` |
+| Correction or pushback on your approach | `memory_write` |
+| Project constraint — deadline, policy, convention, scope limit | `memory_write` |
+| Architectural or technology decision confirmed | `memory_write` |
+| Deferred item ("we'll do X later / remind me / follow up on") | `set_intention` |
 
-## Phase 2 — Category Audit (backstop)
-
-For each category below, if Phase 1 did not already produce a candidate for it, check explicitly:
-
-1. **Preference** — did the user state or confirm how they like things done? ("I prefer X", "I always Y", "I never Z")
-2. **Correction** — did the user push back, say you were wrong, or redirect your approach?
-3. **Project constraint** — did a deadline, policy, convention, or scope limit emerge?
-4. **Architectural decision** — was a design choice, technology, or pattern decided or confirmed?
-5. **Deferred intention** — was something identified as "do later", "follow up", or "remind me"?
-
-Skip a category if nothing genuinely new emerged for it this turn.
+Multiple signals in one exchange → multiple `memory_write` calls, all in this turn. If no signal is present, skip.
 
 ## Write Protocol
 
