@@ -1,7 +1,7 @@
 {
   "name": "agent-brain",
   "displayName": "Agent Brain Memory",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Hosted long-term memory for Cursor via SSE MCP, auto recall, and indexing hooks",
   "author": {
     "name": "Nighthawk Labs"
