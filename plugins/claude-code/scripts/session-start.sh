@@ -57,6 +57,15 @@ wait
 agent_brain_collect_subjects "$tmp_a" "$tmp_u" "$tmp_p"
 block=$(agent_brain_build_skill_block "$tmp_a" "$tmp_u" "$tmp_p")
 
+# Prepend the bundled plugin instruction skill (read locally — not from agent-brain).
+plugin_skill_file="${CLAUDE_PLUGIN_ROOT:-${SCRIPT_DIR}/..}/skills/agent-brain-claude-code.md"
+if [[ -f "$plugin_skill_file" ]]; then
+  plugin_skill=$(cat "$plugin_skill_file")
+  if [[ -n "$plugin_skill" ]]; then
+    [[ -n "$block" ]] && block="${plugin_skill}"$'\n\n'"${block}" || block="${plugin_skill}"
+  fi
+fi
+
 # Append past-due / topic-matched intentions as a separate section.
 if [[ -s "$tmp_int" ]]; then
   intentions_block=$(agent_brain_format_intentions "$(cat "$tmp_int")" || true)

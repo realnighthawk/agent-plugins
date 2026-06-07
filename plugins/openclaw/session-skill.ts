@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { AgentBrainPluginConfig } from "./config.js";
 import { callMcpTool } from "./client.js";
 
@@ -85,6 +88,17 @@ function buildBlock(tiers: TierEntry[]): { block: string; subjects: string[] } {
 // In-process cache: one entry per sessionKey, populated on first call.
 const _cache = new Map<string, SessionSkill>();
 
+async function readPluginSkill(rootDir: string | undefined): Promise<string> {
+  const skillsDir = rootDir
+    ? path.join(rootDir, "skills")
+    : path.join(path.dirname(fileURLToPath(import.meta.url)), "skills");
+  try {
+    return await readFile(path.join(skillsDir, "agent-brain-openclaw.md"), "utf8");
+  } catch {
+    return "";
+  }
+}
+
 export async function getSessionSkill(
   cfg: AgentBrainPluginConfig,
   rootDir: string | undefined,
@@ -119,7 +133,16 @@ export async function getSessionSkill(
     { header: "## Project context", raw: projectRes.status === "fulfilled" ? projectRes.value : "" },
   ];
 
-  const result = buildBlock(tiers);
+  const memoryBlock = buildBlock(tiers);
+  const pluginSkill = await readPluginSkill(rootDir);
+
+  const block = pluginSkill
+    ? memoryBlock.block
+      ? `${pluginSkill}\n\n${memoryBlock.block}`
+      : pluginSkill
+    : memoryBlock.block;
+
+  const result: SessionSkill = { block, subjects: memoryBlock.subjects };
   _cache.set(key, result);
   return result;
 }
