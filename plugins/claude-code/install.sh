@@ -154,9 +154,10 @@ PY
 }
 
 register_claude_plugin() {
-  echo "Registering marketplace with Claude Code..."
-  # || true: "already registered" is not an error
-  claude plugin marketplace add "${PLUGIN_GITHUB_REPO}" --scope user 2>&1 || true
+  echo "Refreshing marketplace with Claude Code..."
+  # Remove first to force re-fetch of marketplace.json (picks up version bumps).
+  claude plugin marketplace remove "${PLUGIN_GITHUB_REPO}" --scope user 2>&1 || true
+  claude plugin marketplace add "${PLUGIN_GITHUB_REPO}" --scope user
 
   echo "Installing agent-brain plugin..."
   claude plugin install agent-brain@agent-plugins --scope user
