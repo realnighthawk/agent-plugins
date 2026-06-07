@@ -3,7 +3,7 @@
 #
 # Usage:
 #   ./plugins/claude-code/install.sh \
-#     --url https://agent-memory.nighthawklabs.org/sse \
+#     --url https://agent-memory.nighthawklabs.org/mcp \
 #     --agent-id claude-you \
 #     --api-key YOUR_KEY
 #

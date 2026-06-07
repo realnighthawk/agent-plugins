@@ -13,7 +13,7 @@ Public client plugins for [agent-brain](https://github.com/realnighthawk/agent-b
 ```bash
 curl -fsSL https://raw.githubusercontent.com/realnighthawk/agent-plugins/main/plugins/cursor/install.sh | bash -s -- \
   --global \
-  --url https://agent-memory.nighthawklabs.org/sse \
+  --url https://agent-memory.nighthawklabs.org/mcp \
   --agent-id cursor-you \
   --api-key YOUR_KEY
 ```

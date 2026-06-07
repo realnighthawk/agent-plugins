@@ -2,7 +2,7 @@
 # Install Agent Brain Cursor plugin (hosted SSE + hooks).
 # Usage:
 #   ./plugins/cursor/install.sh --global \
-#     --url https://agent-memory.nighthawklabs.org/sse \
+#     --url https://agent-memory.nighthawklabs.org/mcp \
 #     --agent-id cursor-agent \
 #     --api-key YOUR_KEY
 #     --version v1.0.0   # optional mcp-call release (default: latest)

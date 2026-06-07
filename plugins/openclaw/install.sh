@@ -3,7 +3,7 @@
 #
 # Usage:
 #   ./plugins/openclaw/install.sh \
-#     --url https://agent-memory.nighthawklabs.org/sse \
+#     --url https://agent-memory.nighthawklabs.org/mcp \
 #     --agent-id openclaw-you \
 #     --api-key YOUR_KEY \
 #     [--config-file ~/.openclaw/openclaw.gemini.json]

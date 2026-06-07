@@ -13,7 +13,7 @@ Native plugin at `plugins/openclaw/`. Connects to **hosted** agent-brain (SSE). 
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/realnighthawk/agent-plugins/main/plugins/openclaw/install.sh | bash -s -- \
-  --url https://agent-memory.nighthawklabs.org/sse \
+  --url https://agent-memory.nighthawklabs.org/mcp \
   --agent-id openclaw-alice \
   --api-key YOUR_KEY \
   --restart

@@ -28,13 +28,13 @@ From the agent-brain repository root:
 ```bash
 # All Cursor workspaces (global ~/.cursor/)
 ./plugins/cursor/install.sh --global \
-  --url https://agent-memory.nighthawklabs.org/sse \
+  --url https://agent-memory.nighthawklabs.org/mcp \
   --agent-id cursor-agent \
   --api-key YOUR_API_KEY
 
 # Or JWT instead of API key:
 ./plugins/cursor/install.sh --global \
-  --url https://agent-memory.nighthawklabs.org/sse \
+  --url https://agent-memory.nighthawklabs.org/mcp \
   --agent-id cursor-agent \
   --jwt "$(go run ./scripts/mint-jwt.go -sub YOUR_USER_ID -secret YOUR_JWT_SECRET)"
 ```
@@ -43,7 +43,7 @@ Remote one-liner:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/realnighthawk/agent-plugins/main/plugins/cursor/install.sh | bash -s -- \
-  --global --url https://agent-memory.nighthawklabs.org/sse --agent-id cursor-you --api-key YOUR_KEY
+  --global --url https://agent-memory.nighthawklabs.org/mcp --agent-id cursor-you --api-key YOUR_KEY
 ```
 
 The script downloads `mcp-call`, copies hooks, writes `~/.cursor/agent-brain.env`, merges `agent-brain` into `~/.cursor/mcp.json`, and installs `~/.cursor/hooks.json`.

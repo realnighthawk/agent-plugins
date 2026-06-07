@@ -15,7 +15,7 @@ Client-only integration: hosted agent-brain **SSE MCP** + Cursor **hooks**. No d
 
 ## Install
 
-**Web UI (Memory Explorer):** open **Get started** and **Settings** in agent-web to register agents, create API keys/JWT, and copy install commands for `https://agent-memory.nighthawklabs.org/sse`.
+**Web UI (Memory Explorer):** open **Get started** and **Settings** in agent-web to register agents, create API keys/JWT, and copy install commands for `https://agent-memory.nighthawklabs.org/mcp`.
 
 **Cursor `/add-plugin`:** when `agent-brain` is published to the Cursor marketplace, run `/add-plugin agent-brain` in chat; otherwise use `install.sh` below.
 
@@ -24,7 +24,7 @@ Client-only integration: hosted agent-brain **SSE MCP** + Cursor **hooks**. No d
 ```bash
 curl -fsSL https://raw.githubusercontent.com/realnighthawk/agent-plugins/main/plugins/cursor/install.sh | bash -s -- \
   --global \
-  --url https://agent-memory.nighthawklabs.org/sse \
+  --url https://agent-memory.nighthawklabs.org/mcp \
   --agent-id cursor-you \
   --api-key YOUR_KEY
 ```
