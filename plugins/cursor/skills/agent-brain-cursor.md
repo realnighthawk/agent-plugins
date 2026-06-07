@@ -1,5 +1,17 @@
 # Cursor Memory Protocol
 
+## Skill Lookup (agent-brain first)
+
+Before starting substantial work — or when the user's request may match a stored procedure — resolve skills in this order:
+
+1. **Injected context** — read session-start and per-turn recall blocks; agent/user/project skill tiers may already be present.
+2. **Agent-brain MCP** — search tenant skills before any Cursor native skill:
+   - `retrieve_skills_for_context({ query: "<task summary>" })` or `list_skills({})`
+   - if a match exists: `invoke_skill({ name: "<skill-name>" })` and follow it fully
+3. **Native fallback only when agent-brain has no relevant skill** — Cursor skills (`~/.cursor/skills`, project `.cursor/skills`) and the Skill tool / `available_skills` list.
+
+Do not skip agent-brain and go straight to native skills when a tenant skill may apply.
+
 After EVERY response, before your next action, run the two-phase memory check.
 
 ## Phase 1 — Reflect
