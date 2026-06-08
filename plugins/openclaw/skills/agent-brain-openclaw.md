@@ -56,7 +56,7 @@ Multiple signals → multiple writes, all in this turn. No crystallization → s
 | Ground-truth — user identity, canonical system state, immutable project fact | `canonical_fact` | `canonical` | 1.0 |
 
 **Common fields (all writes):**
-- `subject` — short canonical label, topic-derived, max ~3 words: `"testing-approach"`, `"vacation-plans"`. Never include dates or raw message text.
+- `subject` — short canonical label, topic-derived, max ~3 words: `"testing-approach"`, `"vacation-plans"`. Never include dates or raw message text. **For preference or behavioral memories, embed the relevant domain keyword in the subject** so the preferences rollup can classify them correctly. Call `memory_preference_profile({})` to discover active domains, then use those labels in subjects (e.g. if `"fitness"` is a domain, use `"fitness-goals"` not `"preferences"`).
 - `content` — one self-contained declarative sentence. Write the conclusion, not the path to it.
 
 **`canonical_fact` constraint:** Writing one invalidates all prior memories on the same subject and cascades contradiction flags against all inferred memories on that subject. Use only when the fact is authoritative and permanent — not for preferences, decisions, or anything that could evolve.
