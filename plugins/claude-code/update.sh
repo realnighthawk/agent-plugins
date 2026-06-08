@@ -10,9 +10,30 @@
 #   curl -fsSL https://raw.githubusercontent.com/realnighthawk/agent-plugins/main/plugins/claude-code/update.sh | bash -s -- --api-key YOUR_KEY
 set -euo pipefail
 
-_script_path="${BASH_SOURCE[0]:-}"
-_plugin_dir="$(cd "$(dirname "${_script_path}")" 2>/dev/null && pwd)"
+PLUGIN_GITHUB_REPO="${AGENT_PLUGINS_GITHUB_REPO:-realnighthawk/agent-plugins}"
+AGENT_PLUGINS_REF="${AGENT_PLUGINS_REF:-main}"
 
-# Delegate to install.sh with --skip-plugin-add so we skip the slow
-# marketplace remove/add/reinstall but still refresh mcp-call and MCP config.
-exec "${_plugin_dir}/install.sh" --skip-plugin-add "$@"
+_script_path="${BASH_SOURCE[0]:-}"
+LOCAL_CHECKOUT=""
+if [[ -n "${_script_path}" ]]; then
+  _lib="$(cd "$(dirname "${_script_path}")/../.." 2>/dev/null && pwd)/scripts/lib/install-repo.sh"
+  if [[ -f "${_lib}" ]]; then
+    # shellcheck source=../../scripts/lib/install-repo.sh
+    . "${_lib}"
+    LOCAL_CHECKOUT="$(plugins_repo_root "${_script_path}")"
+  fi
+fi
+
+if [[ -n "${LOCAL_CHECKOUT}" ]]; then
+  # Local checkout — delegate directly to install.sh
+  exec "${LOCAL_CHECKOUT}/plugins/claude-code/install.sh" --skip-plugin-add "$@"
+else
+  # Remote — download install.sh and run it with --skip-plugin-add
+  _tmpdir=$(mktemp -d)
+  trap 'rm -rf "$_tmpdir"' EXIT
+  _install="${_tmpdir}/install.sh"
+  _raw_base="https://raw.githubusercontent.com/${PLUGIN_GITHUB_REPO}/${AGENT_PLUGINS_REF}"
+  curl -fsSL "${_raw_base}/plugins/claude-code/install.sh" -o "$_install"
+  chmod +x "$_install"
+  exec "$_install" --skip-plugin-add "$@"
+fi
