@@ -59,9 +59,21 @@ Use TLS in production. Do not commit secrets in `mcp.json`.
 Per-user agents live in Postgres (`iam_service_accounts`), not a JSON file.
 
 1. Open **Memory Explorer → Settings** (or call `PUT /v1/explorer/settings/agents` with your API key/JWT).
-2. Register your `NIGHTHAWK_AGENT_ID` (e.g. `cursor-alice`) with role `assistant` and `max_signal_tier: 2` (typical for Cursor).
+2. Register your `NIGHTHAWK_AGENT_ID` (e.g. `cursor-alice`) with role `assistant` and `max_signal_tier: 1`.
 
 New users get default domain ACL `* → *` in `iam_domain_acl`. Restrict domains later via API if needed.
+
+## Update
+
+Syncs hooks and skills to `~/.cursor/` without touching credentials or binaries. No restart needed for skills; restart Cursor for hook changes.
+
+```bash
+# Remote
+curl -fsSL https://raw.githubusercontent.com/realnighthawk/agent-plugins/main/plugins/cursor/update.sh | bash
+
+# Local checkout
+./plugins/cursor/update.sh
+```
 
 ## Smoke test
 

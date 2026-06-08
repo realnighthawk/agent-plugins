@@ -56,6 +56,18 @@ openclaw gateway restart
 openclaw plugins inspect agent-brain --runtime --json
 ```
 
+## Update
+
+Pulls latest from GitHub (remote installs) or skips the pull (local checkout), then restarts the gateway.
+
+```bash
+# Remote
+curl -fsSL https://raw.githubusercontent.com/realnighthawk/agent-plugins/main/plugins/openclaw/update.sh | bash -s -- --restart
+
+# Local checkout — changes already on disk
+openclaw gateway restart
+```
+
 ## Multi-agent (superclaw)
 
 Use one plugin install; set **per-binding** `agentId` via separate OpenClaw agent configs or derived `sessionKey` + `agentPrefix`. Register each specialist in **Settings** (e.g. `openclaw-fitness-coach`, `openclaw-finance-manager`).

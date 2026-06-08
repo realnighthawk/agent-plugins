@@ -40,13 +40,28 @@ export NIGHTHAWK_AGENT_ID=claude-alice
 
 Verify in Claude Code: `/mcp` lists `agent-brain`. After hook changes: `/reload-plugins`.
 
+## Update
+
+Skips marketplace re-registration (`--skip-plugin-add`) but refreshes `mcp-call` and MCP config. From a local checkout, skill changes are live immediately — run `/reload-plugins` in Claude Code instead.
+
+```bash
+# Remote
+curl -fsSL https://raw.githubusercontent.com/realnighthawk/agent-plugins/main/plugins/claude-code/update.sh | bash -s -- \
+  --url https://agent-memory.nighthawklabs.org/mcp \
+  --agent-id claude-alice \
+  --api-key YOUR_KEY
+
+# Local checkout
+./plugins/claude-code/update.sh --api-key YOUR_KEY
+```
+
 ## Agent policy
 
 ```json
 "claude-alice": {
   "role": "assistant",
   "rank": 50,
-  "max_signal_tier": 2
+  "max_signal_tier": 1
 }
 ```
 
