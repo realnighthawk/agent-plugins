@@ -151,44 +151,14 @@ install_mcp_call() {
   echo "Installed ${dest} from release"
 }
 
-ingest_agent_skills() {
-  local skills_dir="${CURSOR_DIR}/skills"
-  [[ -d "$skills_dir" ]] || return 0
-  local bin="${CURSOR_DIR}/bin/mcp-call"
-  [[ -x "$bin" ]] || return 0
-
-  local ok=0 fail=0
-  for skill_file in "${skills_dir}"/*.md; do
-    [[ -f "$skill_file" ]] || continue
-    local name body description args
-    name=$(basename "$skill_file" .md)
-    body=$(cat "$skill_file")
-    description=$(head -n1 "$skill_file" | sed 's/^#[[:space:]]*//')
-    args=$(jq -nc \
-      --arg aid "$AGENT_ID" --arg name "$name" \
-      --arg body "$body" --arg desc "$description" \
-      '{agent_id:$aid,name:$name,body:$body,description:$desc}')
-    if [[ -n "$JWT" ]]; then
-      NIGHTHAWK_JWT="$JWT" NIGHTHAWK_MCP_URL="$MCP_URL" \
-        NIGHTHAWK_AGENT_ID="$AGENT_ID" NIGHTHAWK_MCP_CALL="$bin" \
-        "$bin" ingest_skill "$args" >/dev/null 2>&1 && ok=$(( ok+1 )) || fail=$(( fail+1 ))
-    else
-      NIGHTHAWK_API_KEY="$API_KEY" NIGHTHAWK_MCP_URL="$MCP_URL" \
-        NIGHTHAWK_AGENT_ID="$AGENT_ID" NIGHTHAWK_MCP_CALL="$bin" \
-        "$bin" ingest_skill "$args" >/dev/null 2>&1 && ok=$(( ok+1 )) || fail=$(( fail+1 ))
-    fi
-  done
-  echo "Agent skills ingested: ${ok} ok, ${fail} failed"
-}
-
 echo "Installing mcp-call..."
 install_mcp_call "${CURSOR_DIR}/bin/mcp-call"
 
 echo "Copying hooks..."
 fetch_plugin_files
 
-echo "Ingesting agent-tier skills..."
-ingest_agent_skills
+# Plugin instruction skills are bundled in ~/.cursor/skills/ (copied by fetch_plugin_files)
+# and injected at session start directly from disk. No ingest_skill step needed.
 
 ENV_FILE="${CURSOR_DIR}/agent-brain.env"
 cat >"$ENV_FILE" <<EOF
