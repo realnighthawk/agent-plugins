@@ -161,6 +161,55 @@ Write all extracted memories now, then respond with a summary: N memories writte
 key topics covered.
 ```
 
+### Large conversation chunking
+
+Some conversations exceed what can be fed to a single subagent in one call. The safe
+budget for a transcript (prompt + extraction overhead) is **~40K tokens**. Any conversation
+above this threshold must be split into chunks before dispatch.
+
+**Threshold:** conversations with `estimated_tokens > 40000` in the manifest.
+
+Known large conversations from the Phase 1 dry-run:
+
+| Conversation | Tokens | Project |
+|---|---|---|
+| `superpowers/af2f6fe7` | ~96K | superpowers |
+| `infra/f3a5e374` | ~56K | infra |
+| `agent-plugins/5b7149d2` | ~55K | agent-plugins |
+| `infra/d011780e` | ~52K | infra |
+| `agent-brain/29e0cd67` | ~52K | agent-brain |
+| `ferrosa/ef779bf1` | ~45K | ferrosa |
+| `superclaw/cf4db629` | ~40K | superclaw |
+
+**Splitting strategy:** Divide the transcript into contiguous turn-windows of at most 40K
+tokens, with a **10-turn overlap** between adjacent chunks. The overlap preserves enough
+context that the extractor can see how a decision at the end of one chunk was confirmed
+at the start of the next.
+
+```
+chunk_1: turns 0..N   (≤ 40K tokens)
+chunk_2: turns N-10..M (≤ 40K tokens, 10-turn overlap with chunk_1)
+chunk_3: turns M-10..end
+```
+
+Each chunk is dispatched as a separate subagent with a modified prompt header:
+
+```
+CHUNK: {n} of {total}  (covers turns {start}–{end})
+NOTE: This is a partial transcript. Do not treat silence on a topic as absence —
+the topic may appear in another chunk. Only write facts that are fully resolved
+within this chunk or are clearly stated as decisions.
+```
+
+**Deduplication across chunks:** The contradiction detection system handles facts
+written twice from overlapping chunks. Do not attempt manual dedup — write the fact
+in each chunk where it appears and let the governance worker consolidate.
+
+**Phase 2 runner responsibility:** The runner script (Phase 2) reads the manifest,
+checks `estimated_tokens` against the threshold, auto-splits large transcripts into
+chunk files at `~/.claude/replay/chunks/{project}/{date}-{uuid8}-chunk{n}.txt`, and
+dispatches one subagent per chunk in order.
+
 ### Processing order
 
 Process conversations chronologically (oldest first). This ensures:
@@ -169,9 +218,12 @@ Process conversations chronologically (oldest first). This ensures:
 
 ### Batching
 
-Process one conversation at a time. After each conversation, update `manifest.json` with `"processed": true` and the count of memories written. This allows resuming if a session is interrupted.
+Process one conversation (or chunk) at a time. After each unit, update `manifest.json`
+with `"processed": true` and the count of memories written. This allows resuming if a
+session is interrupted.
 
-**Rate:** The agent-brain server rate-limits writes per user. Process one subagent at a time (not in parallel) to avoid hitting limits.
+**Rate:** The agent-brain server rate-limits writes per user. Process one subagent at a
+time (not in parallel) to avoid hitting limits.
 
 ---
 
@@ -206,5 +258,11 @@ After all conversations are processed, run the following checks in a single Clau
 |---|---|---|
 | Write extraction script | ~1 session | $0 |
 | Run extraction script | <1 min | $0 |
-| Process 68 conversations (subagents) | 2–3 sessions | ~$5–15 API |
+| Write Phase 2 runner script | ~1 session | $0 |
+| Process 48 conversations + ~10 extra chunks for large ones | 2–3 sessions | ~$8–20 API |
 | Verification | ~30 min | <$1 |
+
+**Token budget breakdown:** 48 conversations totalling ~796K transcript tokens. After
+chunking the 7 large conversations, the actual dispatch count is ~58 subagent calls.
+At ~$0.15–0.30 per call (Sonnet 4.5, ~15K tokens in + ~2K out per call on average),
+total cost is roughly $10–18.
