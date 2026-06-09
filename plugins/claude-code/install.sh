@@ -156,7 +156,7 @@ PY
 register_claude_plugin() {
   echo "Refreshing marketplace with Claude Code..."
   # Remove first to force re-fetch of marketplace.json (picks up version bumps).
-  claude plugin marketplace remove "${PLUGIN_GITHUB_REPO}" --scope user 2>&1 || true
+  claude plugin marketplace remove agent-plugins --scope user 2>&1 || true
   claude plugin marketplace add "${PLUGIN_GITHUB_REPO}" --scope user
 
   echo "Installing agent-brain plugin..."
