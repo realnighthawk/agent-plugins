@@ -151,10 +151,9 @@ Replay complete.
   Projects covered        : [list]
 ```
 
-Suggest running Phase 3 verification:
-- `memory_overview` for coverage
-- `memory_search` on "nighthawk", "agent-brain", "superpowers workflow"
-- `list_contradictions` for any conflicts between replay and live memories
+Contradiction detection runs automatically in the background — no manual verification step needed.
+If anything looks wrong, memories can be identified by `agent_id = "claude-code-replay"` and
+corrected or removed on-demand via the memory explorer.
 
 ---
 

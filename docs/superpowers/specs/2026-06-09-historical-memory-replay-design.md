@@ -232,24 +232,6 @@ session is interrupted.
 **Rate:** The agent-brain server rate-limits writes per user. Process one subagent at a
 time (not in parallel) to avoid hitting limits.
 
----
-
-## Phase 3 — Verification
-
-After all conversations are processed, run the following checks in a single Claude Code session:
-
-1. **Coverage check** — `memory_overview` to see memory_by_type and subjects_by_domain counts. Should show meaningful entries across `person:nighthawk`, major artifact subjects, and concept subjects.
-
-2. **Spot checks** — `memory_search` on 5–6 known topics (e.g. "entity taxonomy", "k8s deployment", "nighthawk identity", "superpowers workflow") to verify memories were written correctly.
-
-3. **Contradiction review** — `list_contradictions` to surface any conflicts detected between replay memories and live memories. Resolve the important ones.
-
-4. **Audit review** — `memory_audit_tail` to confirm write counts are reasonable (not too few, not too many).
-
-5. **Cleanup flag** — If any replay memories are clearly wrong (hallucinated facts, misattributed decisions), they can be identified by `agent_id = "claude-code-replay"` and removed or corrected.
-
----
-
 ## What This Does Not Do
 
 - **Does not re-process subagent conversations** — subagent transcripts are implementation noise (code review, test runs, tool calls). Skip them.
@@ -267,7 +249,6 @@ After all conversations are processed, run the following checks in a single Clau
 | Run extraction script | <1 min | $0 |
 | Write Phase 2 skill | ~1 session | $0 |
 | Process 48 conversations + ~10 extra chunks for large ones | 2–3 sessions | ~$8–20 API |
-| Verification | ~30 min | <$1 |
 
 **Token budget breakdown:** 48 conversations totalling ~796K transcript tokens. After
 chunking the 7 large conversations, the actual dispatch count is ~58 subagent calls.
