@@ -4,6 +4,21 @@ Client-only integration for agent-brain: **hosted MCP (SSE)** plus **Cursor hook
 
 No database, Docker, or `go run` in this package.
 
+## Plugin layout
+
+```
+plugins/cursor/
+├── .cursor-plugin/plugin.json   # manifest
+├── hooks/                       # sessionStart, recall, index hook commands
+├── skills/
+│   ├── agent-brain/SKILL.md     # memory write protocol (injected at session start)
+│   └── replay-memory/SKILL.md   # historical transcript → memory extraction
+├── scripts/
+│   ├── extract_conversations.py # Phase 1 replay: ~/.cursor/projects → ~/.cursor/replay
+│   └── ingest-skills.sh         # optional: push bundled skills to agent-brain server
+└── templates/                   # mcp.json, hooks.json templates
+```
+
 ## Prerequisites
 
 - Hosted agent-brain SSE endpoint (e.g. `https://memory.example.com/sse`)

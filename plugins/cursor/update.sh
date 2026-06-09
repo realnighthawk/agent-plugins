@@ -61,8 +61,17 @@ sync_files() {
   cp -R "${src}/hooks/lib/"*.sh "${CURSOR_DIR}/hooks/lib/"
   chmod +x "${CURSOR_DIR}/hooks/"*.sh "${CURSOR_DIR}/hooks/lib/"*.sh
   if [[ -d "${src}/skills" ]]; then
-    mkdir -p "${CURSOR_DIR}/skills"
-    cp -R "${src}/skills/"*.md "${CURSOR_DIR}/skills/" 2>/dev/null || true
+    # shellcheck source=scripts/lib/copy-skills.sh
+    source "${src}/scripts/lib/copy-skills.sh"
+    copy_plugin_skills "${src}/skills" "${CURSOR_DIR}/skills"
+  fi
+  if [[ -d "${src}/scripts" ]]; then
+    mkdir -p "${CURSOR_DIR}/scripts/lib"
+    cp "${src}/scripts/"*.py "${CURSOR_DIR}/scripts/" 2>/dev/null || true
+    cp "${src}/scripts/"*.sh "${CURSOR_DIR}/scripts/" 2>/dev/null || true
+    cp "${src}/scripts/lib/"*.sh "${CURSOR_DIR}/scripts/lib/" 2>/dev/null || true
+    chmod +x "${CURSOR_DIR}/scripts/"*.sh "${CURSOR_DIR}/scripts/lib/"*.sh 2>/dev/null || true
+    chmod +x "${CURSOR_DIR}/scripts/"*.py 2>/dev/null || true
   fi
   [[ -n "$tmpdir" ]] && rm -rf "$tmpdir"
 }

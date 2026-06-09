@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# Ingest agent-tier skills into agent-brain server.
+# Ingest bundled plugin skills into agent-brain server.
 # Run once after install, and again whenever skill files are updated.
 #
 # Usage:
-#   NIGHTHAWK_AGENT_ID=claude-you ./scripts/ingest-skills.sh
+#   set -a && source ~/.cursor/agent-brain.env && set +a
+#   ~/.cursor/scripts/ingest-skills.sh
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=lib/common.sh
-source "${SCRIPT_DIR}/lib/common.sh"
+# shellcheck source=../hooks/lib/common.sh
+source "${SCRIPT_DIR}/../hooks/lib/common.sh"
+
+agent_brain_load_env || true
 
 if [[ -z "${NIGHTHAWK_MCP_URL:-}" ]]; then
   echo "NIGHTHAWK_MCP_URL not set — source your env file first." >&2

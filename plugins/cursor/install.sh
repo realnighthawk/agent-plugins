@@ -103,8 +103,17 @@ fetch_plugin_files() {
   cp -R "${src}/hooks/lib/"*.sh "${CURSOR_DIR}/hooks/lib/"
   chmod +x "${CURSOR_DIR}/hooks/"*.sh "${CURSOR_DIR}/hooks/lib/"*.sh
   if [[ -d "${src}/skills" ]]; then
-    mkdir -p "${CURSOR_DIR}/skills"
-    cp -R "${src}/skills/"*.md "${CURSOR_DIR}/skills/" 2>/dev/null || true
+    # shellcheck source=scripts/lib/copy-skills.sh
+    source "${src}/scripts/lib/copy-skills.sh"
+    copy_plugin_skills "${src}/skills" "${CURSOR_DIR}/skills"
+  fi
+  if [[ -d "${src}/scripts" ]]; then
+    mkdir -p "${CURSOR_DIR}/scripts/lib"
+    cp "${src}/scripts/"*.py "${CURSOR_DIR}/scripts/" 2>/dev/null || true
+    cp "${src}/scripts/"*.sh "${CURSOR_DIR}/scripts/" 2>/dev/null || true
+    cp "${src}/scripts/lib/"*.sh "${CURSOR_DIR}/scripts/lib/" 2>/dev/null || true
+    chmod +x "${CURSOR_DIR}/scripts/"*.sh "${CURSOR_DIR}/scripts/lib/"*.sh 2>/dev/null || true
+    chmod +x "${CURSOR_DIR}/scripts/"*.py 2>/dev/null || true
   fi
   [[ -n "$tmpdir" ]] && rm -rf "$tmpdir"
 }
@@ -268,7 +277,8 @@ echo "  2. Create API key or JWT in Settings if you did not pass --api-key / --j
 echo ""
 echo "MCP note: ${ENV_FILE} is for hooks/mcp-call only. Cursor remote MCP does not load envFile or \${NIGHTHAWK_*}."
 echo "Next: restart Cursor, enable Hooks (Settings), check Hooks output channel."
-echo "Re-ingest skills after updates: set -a && source ${ENV_FILE} && set +a && ${CURSOR_DIR}/hooks/lib/../../../bin/mcp-call ingest_skill ..."
+echo "Re-ingest skills after updates: set -a && source ${ENV_FILE} && set +a && ${CURSOR_DIR}/scripts/ingest-skills.sh"
+echo "Replay Phase 1: python3 ${CURSOR_DIR}/scripts/extract_conversations.py"
 echo "Smoke test:"
 echo "  set -a && source ${ENV_FILE} && set +a"
 echo "  ${CURSOR_DIR}/bin/mcp-call memory_system_status '{}'"
