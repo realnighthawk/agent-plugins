@@ -277,7 +277,7 @@ echo "  2. Create API key or JWT in Settings if you did not pass --api-key / --j
 echo ""
 echo "MCP note: ${ENV_FILE} is for hooks/mcp-call only. Cursor remote MCP does not load envFile or \${NIGHTHAWK_*}."
 echo "Next: restart Cursor, enable Hooks (Settings), check Hooks output channel."
-echo "Re-ingest skills after updates: set -a && source ${ENV_FILE} && set +a && ${CURSOR_DIR}/scripts/ingest-skills.sh"
+echo "Bundled skills (agent-brain, replay-memory) are local-only — re-run update.sh after skill changes."
 echo "Replay Phase 1: python3 ${CURSOR_DIR}/scripts/extract_conversations.py"
 echo "Smoke test:"
 echo "  set -a && source ${ENV_FILE} && set +a"

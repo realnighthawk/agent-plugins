@@ -14,8 +14,7 @@ plugins/cursor/
 │   ├── agent-brain/SKILL.md     # memory write protocol (injected at session start)
 │   └── replay-memory/SKILL.md   # historical transcript → memory extraction
 ├── scripts/
-│   ├── extract_conversations.py # Phase 1 replay: ~/.cursor/projects → ~/.cursor/replay
-│   └── ingest-skills.sh         # optional: push bundled skills to agent-brain server
+│   └── extract_conversations.py # Phase 1 replay: ~/.cursor/projects → ~/.cursor/replay
 └── templates/                   # mcp.json, hooks.json templates
 ```
 
@@ -61,7 +60,9 @@ curl -fsSL https://raw.githubusercontent.com/realnighthawk/agent-plugins/main/pl
   --global --url https://agent-memory.nighthawklabs.org/mcp --agent-id cursor-you --api-key YOUR_KEY
 ```
 
-The script downloads `mcp-call`, copies hooks, writes `~/.cursor/agent-brain.env`, merges `agent-brain` into `~/.cursor/mcp.json`, and installs `~/.cursor/hooks.json`.
+The script downloads `mcp-call`, copies hooks and **local** bundled skills (`agent-brain`, `replay-memory`), writes `~/.cursor/agent-brain.env`, merges `agent-brain` into `~/.cursor/mcp.json`, and installs `~/.cursor/hooks.json`.
+
+Bundled plugin skills are **not** uploaded to agent-brain — `session-start` reads them from disk. After editing skills in the repo, run `./scripts/sync-agent-brain-skills.sh` then `plugins/cursor/update.sh`.
 
 Restart Cursor. Enable **Hooks** in Settings and check the Hooks output channel.
 

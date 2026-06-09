@@ -4,6 +4,8 @@ Official [Claude Code plugin](https://code.claude.com/docs/en/plugins-reference)
 
 Client-only: connects to **hosted** agent-brain over HTTP/SSE. No Postgres or `go run` in the plugin.
 
+Bundled skills (`agent-brain`, `replay-memory`) are **local-only** — injected at session start from `skills/` on disk, not via `ingest_skill`.
+
 ## Plugin layout
 
 ```
