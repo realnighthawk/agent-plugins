@@ -41,26 +41,39 @@ From the agent-brain repository root:
 
 ```bash
 # All Cursor workspaces (global ~/.cursor/)
-./plugins/cursor/install.sh --global \
+./plugins/cursor/install.sh --scope global \
   --url https://agent-memory.nighthawklabs.org/mcp \
   --agent-id cursor-agent \
   --api-key YOUR_API_KEY
 
 # Or JWT instead of API key:
-./plugins/cursor/install.sh --global \
+./plugins/cursor/install.sh --scope global \
   --url https://agent-memory.nighthawklabs.org/mcp \
   --agent-id cursor-agent \
   --jwt "$(go run ./scripts/mint-jwt.go -sub YOUR_USER_ID -secret YOUR_JWT_SECRET)"
+
+# Project-scoped install (./.cursor/)
+./plugins/cursor/install.sh --scope project --api-key YOUR_API_KEY
 ```
+
+`--global` and `--project` are aliases for `--scope global` and `--scope project`.
 
 Remote one-liner:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/realnighthawk/agent-plugins/main/plugins/cursor/install.sh | bash -s -- \
-  --global --url https://agent-memory.nighthawklabs.org/mcp --agent-id cursor-you --api-key YOUR_KEY
+  --scope global --url https://agent-memory.nighthawklabs.org/mcp --agent-id cursor-you --api-key YOUR_KEY
 ```
 
-The script downloads `mcp-call`, copies hooks and **local** bundled skills (`agent-brain`, `replay-memory`), writes `~/.cursor/agent-brain.env`, merges `agent-brain` into `~/.cursor/mcp.json`, and installs `~/.cursor/hooks.json`.
+The script removes any existing Agent Brain install, builds `mcp-call`, copies hooks and **local** bundled skills (`agent-brain`, `replay-memory`), writes `agent-brain.env`, merges `agent-brain` into `mcp.json`, and installs `hooks.json`.
+
+## Update
+
+Reinstall in place (credentials loaded from `agent-brain.env` if omitted):
+
+```bash
+./plugins/cursor/update.sh --scope global
+```
 
 Bundled plugin skills are **not** uploaded to agent-brain — `session-start` reads them from disk. After editing skills in the repo, run `./scripts/sync-agent-brain-skills.sh` then `plugins/cursor/update.sh`.
 
