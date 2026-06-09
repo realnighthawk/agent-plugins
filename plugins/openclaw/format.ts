@@ -49,6 +49,36 @@ function parseIntentions(raw: string): IntentionRow[] {
   return [];
 }
 
+export type EntityTypeRow = {
+  name?: string;
+  is_root?: boolean;
+  description?: string;
+};
+
+function parseEntityTypes(raw: string): EntityTypeRow[] {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed !== null && typeof parsed === "object") {
+      const p = parsed as Record<string, unknown>;
+      if (Array.isArray(p.types)) return p.types as EntityTypeRow[];
+    }
+    if (Array.isArray(parsed)) return parsed as EntityTypeRow[];
+  } catch {
+    // ignore
+  }
+  return [];
+}
+
+export function formatEntityTypesBlock(raw: string): string {
+  const types = parseEntityTypes(raw);
+  if (types.length === 0) return "";
+  const lines = types.map((t) => {
+    const root = t.is_root ? " (root)" : "";
+    return `- ${t.name ?? "unknown"}${root}: ${t.description ?? ""}`;
+  });
+  return ["## Entity taxonomy (agent-brain)", ...lines].join("\n");
+}
+
 export function formatIntentionsBlock(raw: string): string {
   const intentions = parseIntentions(raw).filter(
     (i) => i.status === "pending" || i.status === "triggered",

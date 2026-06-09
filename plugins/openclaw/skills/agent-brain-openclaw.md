@@ -33,6 +33,25 @@ If yes → write. If no → skip.
 
 Multiple signals → multiple writes, all in this turn. No crystallization → skip.
 
+## Classify Before Writing
+
+Before choosing entity_type or tool, classify the content. **Tasks are the most common misclassification.**
+
+| Content type | What it looks like | Write as |
+|---|---|---|
+| **Task** — something that needs to happen: a bug, fix, TODO, follow-up, improvement | "X requires two fixes", "we need to add Y", "this is broken" | `set_intention` — one per actionable item |
+| **Fact** — what something IS or how something works | "agent-brain uses Qdrant", "user prefers async" | `memory_write` |
+| **Preference / constraint** — how the user wants things | "never mock the database", "prefer Vue over React" | `memory_write`, `signal_type: user-stated` |
+| **Decision** — a resolved choice | "chose pgvector for this project" | `memory_write`, `signal_type: user-stated` |
+
+**Key rule:** If the content describes something that *needs to be done*, it is a task — even if you discovered it yourself, not from a user instruction. Write it as one `set_intention` per actionable item, not as an `inferred_fact`.
+
+Anti-patterns:
+- ❌ `inferred_fact` on `artifact:finance-manager` with content "requires two fixes: (1)… (2)…"
+- ✅ `set_intention` topic="finance-manager fix step-2 path" + `set_intention` topic="finance-manager align vision prompt schema"
+
+**Compound content:** If you identify multiple distinct things in one observation, decompose — one write per item. Never write a numbered list as a single memory.
+
 **Do not write per-turn observations. Write the synthesized understanding.**
 
 | Instead of | Write |
@@ -55,14 +74,12 @@ Multiple signals → multiple writes, all in this turn. No crystallization → s
 | Fact derived from a tool or API result | `inferred_fact` | `tool-output` | 0.85–0.90 |
 | Ground-truth — user identity, canonical system state, immutable project fact | `canonical_fact` | `canonical` | 1.0 |
 
-**Session start — call once per session before writing:**
-```
-list_entity_types({ agent_id: "<your-agent-id>" })
-```
-This returns the active taxonomy (6 roots + any user-registered subtypes). If you encounter a kind of thing not in the list, register it before writing:
+**Entity taxonomy** is injected at session start under `## Entity taxonomy (agent-brain)`. Use only `entity_type` values from that list. If you encounter a kind of thing not listed, register it before writing:
+
 ```
 register_entity_type({ agent_id: "...", name: "football-club", parent: "concept", description: "An association football club or team" })
 ```
+
 Name must be kebab-case. Parent must already exist. Description must be ≥10 chars.
 
 **Common fields (all writes):**
@@ -72,16 +89,23 @@ Name must be kebab-case. Parent must already exist. Description must be ≥10 ch
 
 **Choosing entity_type + concept:**
 
+`entity_type` describes what the **subject IS** — not the domain of the content. Ask: "what entity am I writing a fact *about*?" — that entity's type is the `entity_type`.
+
 | What you're writing about | entity_type | concept example |
 |---|---|---|
 | The user (nighthawk) | `person` | `nighthawk` |
 | An AI agent | `person` (subtype: `agent`) | `claude-code` |
 | A city or location | `place` | `manchester` |
-| A football club | `concept` (or register `football-club`) | `manchester-united` |
-| A software tool | `artifact` | `agent-brain` |
-| A project or idea | `concept` | `entity-taxonomy` |
-| A workout session | `event` | `morning-workout` |
+| An organization, club, company | `concept` (or register subtype) | `manchester-united` |
+| A topic, idea, pattern, methodology | `concept` | `entity-taxonomy` |
+| A software tool, repo, or system | `artifact` | `agent-brain` |
+| A technology, library, or framework | `concept` | `pgvector` |
+| A discrete bounded occurrence | `event` | `dubai-trip-2026` |
 | An animal or plant | `organism` | `max-the-dog` |
+
+`concept` is the correct default for anything abstract: organizations, domains, methodologies, patterns, technologies. Reserve `artifact` for concrete made things (software repos, hardware, buildings) — not for "this content is about software."
+
+`concept` must be kebab-case, 1–4 words, no dates. It names the entity, not the content.
 
 Use `memory_write_batch` when writing 2+ memories in one turn — more efficient than sequential calls.
 
@@ -91,6 +115,7 @@ Use `memory_write_batch` when writing 2+ memories in one turn — more efficient
 
 - Explicit deferral ("remind me", "follow up on X") → `set_intention(content, topic)`. `topic`: short label for the deferred task.
 - Implicit deferral (topic raised but unresolved, user signals return) → `set_intention(content, topic)`.
+- **Agent-identified task** — you observe that something is broken, needs a fix, or needs a follow-up, even without a user instruction → `set_intention`. One intention per actionable item.
 - Intention triggered this session → `complete_intention(intention_id)`.
 
 ## Project Skills
@@ -104,3 +129,5 @@ User codifies a reusable rule or convention for this repo → `ingest_skill(name
 - Facts already present in recalled context that have not changed
 - Intermediate observations that didn't crystallize into a conclusion
 - Anything with confidence < 0.65 — skip rather than guess
+- **Task observations as memories** — "X requires a fix", "Y is broken", "we need to add Z" → write as `set_intention`, not `inferred_fact`
+- **Compound numbered lists as a single memory** — decompose into atomic writes or intentions first

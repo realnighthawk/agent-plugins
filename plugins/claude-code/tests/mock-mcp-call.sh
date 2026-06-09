@@ -16,6 +16,12 @@ case "${1:-}" in
   retrieve_skills_for_context)
     echo '{"content":"Use memory_write for durable facts. Tool discipline: never store locally."}'
     ;;
+  list_entity_types)
+    echo '{"types":[{"name":"person","is_root":true,"description":"humans and AI agents"},{"name":"place","is_root":true,"description":"locations"},{"name":"organism","is_root":true,"description":"living non-human"},{"name":"artifact","is_root":true,"description":"made things"},{"name":"event","is_root":true,"description":"bounded occurrences"},{"name":"concept","is_root":true,"description":"abstract entities"}]}'
+    ;;
+  check_intentions)
+    echo '[]'
+    ;;
   *)
     echo "unknown tool: $1" >&2
     exit 1

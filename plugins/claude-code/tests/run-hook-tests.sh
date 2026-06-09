@@ -20,6 +20,7 @@ out=$("${ROOT}/scripts/session-start.sh" < "${ROOT}/tests/fixtures/session-start
 echo "$out" | jq -e '.hookSpecificOutput.additionalContext | contains("Agent context")' >/dev/null
 echo "$out" | jq -e '.hookSpecificOutput.additionalContext | contains("Your profile")' >/dev/null
 echo "$out" | jq -e '.hookSpecificOutput.additionalContext | contains("Project context")' >/dev/null
+echo "$out" | jq -e '.hookSpecificOutput.additionalContext | contains("Entity taxonomy")' >/dev/null
 test -f "/tmp/agent-brain-subjects-agent-brain-abc123"
 
 echo "== SessionStart: empty tier omitted =="
@@ -31,6 +32,8 @@ case "${1:-}" in
   memory_preference_profile) echo '{}' ;;
   retrieve_skills_for_context) echo '{"content":"agent rules"}' ;;
   memory_search) echo '[]' ;;
+  check_intentions) echo '[]' ;;
+  list_entity_types) echo '{"types":[]}' ;;
   *) echo "unknown tool: $1" >&2; exit 1 ;;
 esac
 MOCK
@@ -68,14 +71,21 @@ case "${1:-}" in
   memory_search)
     content=$(printf '%2000s' | tr ' ' 'z')
     echo "[{\"subject_raw\":\"proj\",\"content\":\"$content\"}]" ;;
+  check_intentions) echo '[]' ;;
+  list_entity_types) echo '{"types":[{"name":"person","is_root":true,"description":"humans"}]}' ;;
   *) echo "unknown tool: $1" >&2; exit 1 ;;
 esac
 MOCK
 export NIGHTHAWK_MCP_CALL="$OVERSIZE_MOCK"
 out=$("${ROOT}/scripts/session-start.sh" < "${ROOT}/tests/fixtures/session-start.json")
 result=$(echo "$out" | jq -r '.hookSpecificOutput.additionalContext // ""')
-if [[ ${#result} -gt 4800 ]]; then
-  echo "FAIL: additionalContext exceeds 4800 chars (got ${#result})" >&2; exit 1
+# Plugin skill + taxonomy are always prepended; tier block alone is capped at 4800.
+if [[ ${#result} -gt 15000 ]]; then
+  echo "FAIL: additionalContext exceeds 15000 chars (got ${#result})" >&2; exit 1
+fi
+# Oversized tier payloads must be truncated (not full 2000-char blobs).
+if echo "$result" | grep -q "$(printf '%2000s' | tr ' ' 'z')"; then
+  echo "FAIL: project tier was not truncated" >&2; exit 1
 fi
 export NIGHTHAWK_MCP_CALL="${ROOT}/tests/mock-mcp-call.sh"
 rm -f "$OVERSIZE_MOCK"

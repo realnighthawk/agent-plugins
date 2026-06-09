@@ -15,6 +15,21 @@ agent_brain_format_recall() {
   printf '%s\n%s' "## Memory context (agent-brain)" "$lines"
 }
 
+agent_brain_format_entity_types() {
+  local json="$1"
+  local lines
+  lines=$(echo "$json" | jq -r '
+    (if type == "object" and (.types // empty | type) == "array" then .types
+     elif type == "array" then .
+     else [] end)[]
+    | "- \(.name)\(if .is_root then " (root)" else "" end): \(.description // "")"
+  ' 2>/dev/null) || return 1
+  if [[ -z "$lines" ]]; then
+    return 0
+  fi
+  printf '%s\n%s' "## Entity taxonomy (agent-brain)" "$lines"
+}
+
 agent_brain_format_intentions() {
   local json="$1"
   local lines

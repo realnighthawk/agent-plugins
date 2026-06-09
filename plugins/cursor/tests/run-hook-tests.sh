@@ -25,18 +25,21 @@ echo "$out" | jq -e '. == {}' >/dev/null
 sid=$(cat "$CURSOR_PROJECT_DIR/.cursor/state/agent-brain-session")
 test -f "/tmp/agent-brain-subjects-${sid}"
 test -f "/tmp/agent-brain-skill-block-${sid}"
+grep -q "Entity taxonomy" "/tmp/agent-brain-skill-block-${sid}"
 
-echo "== session-start: all tiers fail -> clean start =="
-rm -f "/tmp/agent-brain-skill-block-$(cat "$CURSOR_PROJECT_DIR/.cursor/state/agent-brain-session")"
+echo "== session-start: all tiers fail -> bundled plugin skill only =="
+sid=$(cat "$CURSOR_PROJECT_DIR/.cursor/state/agent-brain-session")
+rm -f "/tmp/agent-brain-skill-block-${sid}"
 FAIL_MOCK=$(mktemp); chmod +x "$FAIL_MOCK"
 printf '#!/usr/bin/env bash\nexit 1\n' > "$FAIL_MOCK"
 REAL_MOCK="${NIGHTHAWK_MCP_CALL}"
 export NIGHTHAWK_MCP_CALL="$FAIL_MOCK"
 out=$("${ROOT}/hooks/session-start.sh" < "${ROOT}/tests/fixtures/session-start.json")
 echo "$out" | jq -e '. == {}' >/dev/null
-test ! -f "/tmp/agent-brain-skill-block-$(cat "$CURSOR_PROJECT_DIR/.cursor/state/agent-brain-session")"
+test -f "/tmp/agent-brain-skill-block-${sid}"
+grep -q "Cursor Memory Protocol" "/tmp/agent-brain-skill-block-${sid}"
 export NIGHTHAWK_MCP_CALL="$REAL_MOCK"
-rm -f "$FAIL_MOCK"
+rm -f "$FAIL_MOCK" "/tmp/agent-brain-skill-block-${sid}"
 
 echo "== recall =="
 out=$("${ROOT}/hooks/recall.sh" < "${ROOT}/tests/fixtures/recall-prompt.json")
@@ -65,12 +68,17 @@ grep -q 'exclude_subjects' "$CALL_LOG"
 rm -f "$CALL_LOG" "/tmp/agent-brain-subjects-${sid}"
 unset NIGHTHAWK_MOCK_CALL_LOG
 
-echo "== index =="
-MARKER="${TMP}/index-called"
-export NIGHTHAWK_MOCK_INDEX_MARKER="$MARKER"
-rm -f "$MARKER"
-"${ROOT}/hooks/index.sh" < "${ROOT}/tests/fixtures/index-turn.json"
-test -f "$MARKER"
+echo "== index: completes triggered intentions =="
+sid=$(cat "$CURSOR_PROJECT_DIR/.cursor/state/agent-brain-session")
+triggered_file="/tmp/agent-brain-triggered-intentions-${sid}"
+printf 'intention-abc\n' > "$triggered_file"
+CALL_LOG=$(mktemp)
+export NIGHTHAWK_MOCK_CALL_LOG="$CALL_LOG"
+"${ROOT}/hooks/index.sh" < "${ROOT}/tests/fixtures/index-turn.json" >/dev/null
+grep -q 'complete_intention' "$CALL_LOG"
+test ! -f "$triggered_file"
+rm -f "$CALL_LOG"
+unset NIGHTHAWK_MOCK_CALL_LOG
 
 rm -rf "$TMP"
 echo "All hook tests passed."

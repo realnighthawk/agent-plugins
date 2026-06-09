@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { formatRecallBlock } from "../format.ts";
+import { formatRecallBlock, formatEntityTypesBlock } from "../format.ts";
 import { saveLastUserPrompt, loadLastUserPrompt } from "../session-state.ts";
 import os from "node:os";
 
@@ -16,6 +16,18 @@ describe("formatRecallBlock", () => {
 
   it("returns empty for no rows", () => {
     assert.equal(formatRecallBlock([], 8), "");
+  });
+});
+
+describe("formatEntityTypesBlock", () => {
+  it("formats entity type rows", () => {
+    const block = formatEntityTypesBlock(
+      JSON.stringify({
+        types: [{ name: "person", is_root: true, description: "humans" }],
+      }),
+    );
+    assert.ok(block.includes("Entity taxonomy"));
+    assert.ok(block.includes("person (root)"));
   });
 });
 

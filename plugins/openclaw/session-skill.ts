@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AgentBrainPluginConfig } from "./config.js";
 import { callMcpTool } from "./client.js";
+import { formatEntityTypesBlock } from "./format.js";
 
 const MAX_TIER_CHARS = 1600;
 const MAX_TOTAL_CHARS = 4800;
@@ -109,7 +110,7 @@ export async function getSessionSkill(
   const cached = _cache.get(key);
   if (cached) return cached;
 
-  const [agentRes, userRes, projectRes] = await Promise.allSettled([
+  const [agentRes, userRes, projectRes, entityTypesRes] = await Promise.allSettled([
     callMcpTool(
       cfg,
       rootDir,
@@ -125,6 +126,13 @@ export async function getSessionSkill(
       { query: cwdBasename, limit: 6, use_graph: true },
       sessionKey,
     ),
+    callMcpTool(
+      cfg,
+      rootDir,
+      "list_entity_types",
+      { agent_id: cfg.agentId ?? cfg.agentPrefix ?? "unknown" },
+      sessionKey,
+    ),
   ]);
 
   const tiers: TierEntry[] = [
@@ -135,12 +143,17 @@ export async function getSessionSkill(
 
   const memoryBlock = buildBlock(tiers);
   const pluginSkill = await readPluginSkill(rootDir);
+  const entityTypesBlock =
+    entityTypesRes.status === "fulfilled" ? formatEntityTypesBlock(entityTypesRes.value) : "";
 
-  const block = pluginSkill
+  let block = pluginSkill
     ? memoryBlock.block
       ? `${pluginSkill}\n\n${memoryBlock.block}`
       : pluginSkill
     : memoryBlock.block;
+  if (entityTypesBlock) {
+    block = block ? `${block}\n\n${entityTypesBlock}` : entityTypesBlock;
+  }
 
   const result: SessionSkill = { block, subjects: memoryBlock.subjects };
   _cache.set(key, result);

@@ -38,7 +38,8 @@ tmp_a=$(mktemp)
 tmp_u=$(mktemp)
 tmp_p=$(mktemp)
 tmp_int=$(mktemp)
-trap 'rm -f "${tmp_a:-}" "${tmp_u:-}" "${tmp_p:-}" "${tmp_int:-}"' EXIT
+tmp_et=$(mktemp)
+trap 'rm -f "${tmp_a:-}" "${tmp_u:-}" "${tmp_p:-}" "${tmp_int:-}" "${tmp_et:-}"' EXIT
 
 (_run_with_timeout 8 agent_brain_mcp_call retrieve_skills_for_context \
   "$(jq -nc --arg aid "${NIGHTHAWK_AGENT_ID:-unknown}" --arg q "agent session context" '{agent_id:$aid,query:$q}')" \
@@ -52,17 +53,28 @@ trap 'rm -f "${tmp_a:-}" "${tmp_u:-}" "${tmp_p:-}" "${tmp_int:-}"' EXIT
   "$(jq -nc --arg aid "${NIGHTHAWK_AGENT_ID:-unknown}" --arg ctx "session start ${cwd_basename}" \
     '{agent_id:$aid,context_text:$ctx}')" \
   > "$tmp_int" 2>/dev/null) &
+(_run_with_timeout 8 agent_brain_mcp_call list_entity_types \
+  "$(jq -nc --arg aid "${NIGHTHAWK_AGENT_ID:-unknown}" '{agent_id:$aid}')" \
+  > "$tmp_et" 2>/dev/null) &
 wait
 
 agent_brain_collect_subjects "$tmp_a" "$tmp_u" "$tmp_p"
 block=$(agent_brain_build_skill_block "$tmp_a" "$tmp_u" "$tmp_p")
 
 # Prepend the bundled plugin instruction skill (read locally — not from agent-brain).
-plugin_skill_file="${CLAUDE_PLUGIN_ROOT:-${SCRIPT_DIR}/..}/skills/agent-brain-claude-code.md"
+plugin_skill_file="${CLAUDE_PLUGIN_ROOT:-${SCRIPT_DIR}/..}/skills/agent-brain/SKILL.md"
 if [[ -f "$plugin_skill_file" ]]; then
   plugin_skill=$(cat "$plugin_skill_file")
   if [[ -n "$plugin_skill" ]]; then
     [[ -n "$block" ]] && block="${plugin_skill}"$'\n\n'"${block}" || block="${plugin_skill}"
+  fi
+fi
+
+if [[ -s "$tmp_et" ]]; then
+  taxonomy_block=$(agent_brain_format_entity_types "$(cat "$tmp_et")" || true)
+  if [[ -n "$taxonomy_block" ]]; then
+    [[ -n "$block" ]] && block+=$'\n\n'
+    block+="$taxonomy_block"
   fi
 fi
 
@@ -86,7 +98,7 @@ if [[ -s "$tmp_int" ]]; then
   fi
 fi
 
-rm -f "$tmp_a" "$tmp_u" "$tmp_p" "$tmp_int"
+rm -f "$tmp_a" "$tmp_u" "$tmp_p" "$tmp_int" "$tmp_et"
 
 if [[ -n "$block" ]]; then
   agent_brain_emit_context "SessionStart" "$block"

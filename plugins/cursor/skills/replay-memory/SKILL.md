@@ -1,7 +1,7 @@
 # Replay Memory Extraction
 
-Extract memories from historical Claude Code conversation transcripts into agent-brain.
-Reads `~/.claude/replay/manifest.json`, dispatches one subagent per conversation (or chunk
+Extract memories from historical Cursor conversation transcripts into agent-brain.
+Reads `~/.cursor/replay/manifest.json`, dispatches one subagent per conversation (or chunk
 for large conversations), and updates the manifest as work progresses. Fully resumable —
 re-invoking the skill skips already-processed items.
 
@@ -10,10 +10,16 @@ re-invoking the skill skips already-processed items.
 Phase 1 must have been run first:
 
 ```bash
-python3 /Users/abishekkumar/Documents/agent-plugins/scripts/extract_conversations.py
+python3 ~/.cursor/scripts/extract_conversations.py
 ```
 
-This produces `~/.claude/replay/manifest.json` and the transcript files it references.
+Or from a local checkout:
+
+```bash
+python3 plugins/cursor/scripts/extract_conversations.py
+```
+
+This produces `~/.cursor/replay/manifest.json` and the transcript files it references.
 
 ---
 
@@ -21,7 +27,7 @@ This produces `~/.claude/replay/manifest.json` and the transcript files it refer
 
 ### Step 1 — Load manifest
 
-Read `~/.claude/replay/manifest.json`. Filter to items where `"processed": false`, sorted
+Read `~/.cursor/replay/manifest.json`. Filter to items where `"processed": false`, sorted
 by `"date"` ascending (chronological). Count and report:
 
 ```
@@ -52,16 +58,16 @@ Build chunks greedily:
 - Overlap: include the last 10 turns of the previous chunk at the start of the next
 - Label each chunk: `chunk N of total`
 
-Write each chunk to `~/.claude/replay/chunks/{project}/{date}-{uuid8}-chunk{n}of{total}.txt`.
+Write each chunk to `~/.cursor/replay/chunks/{project}/{date}-{uuid8}-chunk{n}of{total}.txt`.
 
 #### 2d. Dispatch extraction subagent for each unit
 
-For each unit, dispatch a subagent with this exact prompt (fill in the placeholders):
+For each unit, dispatch a subagent with the Task tool using this exact prompt (fill in the placeholders):
 
 ---
 
 ```
-You are extracting memories from a historical Claude Code conversation transcript.
+You are extracting memories from a historical Cursor conversation transcript.
 Your job: identify facts that should survive in long-term memory and write them to
 agent-brain using the MCP tools available to you.
 
@@ -69,13 +75,12 @@ CONTEXT
 - Project: {project}
 - Date: {date}
 - Conversation ID: {uuid}
-- User identity: nighthawk (abishekkumar92@gmail.com)
-- Agent ID to use for ALL writes: "claude-code-replay"
+- Agent ID to use for ALL writes: "cursor-replay"
 - Session ID to use: "replay-{uuid8}"
 {chunk_header}
 
 STEP 1 — Taxonomy
-Call list_entity_types({ agent_id: "claude-code-replay" }) to load the current taxonomy.
+Call list_entity_types({ agent_id: "cursor-replay" }) to load the current taxonomy.
 Do this before writing any memory.
 
 STEP 2 — Classify then Extract
@@ -174,7 +179,7 @@ Replay complete.
 ```
 
 Contradiction detection runs automatically in the background — no manual verification step needed.
-If anything looks wrong, memories can be identified by `agent_id = "claude-code-replay"` and
+If anything looks wrong, memories can be identified by `agent_id = "cursor-replay"` and
 corrected or removed on-demand via the memory explorer.
 
 ---
