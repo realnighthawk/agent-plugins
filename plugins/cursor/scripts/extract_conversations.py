@@ -9,7 +9,8 @@ compressed), and writes them to ~/.cursor/replay/transcripts/{project}/{date}-{u
 Also produces ~/.cursor/replay/manifest.json sorted chronologically.
 
 Usage:
-    python3 extract_conversations.py [--dry-run]
+    python3 extract_conversations.py [--dry-run] [--project NAME]
+    python3 extract_conversations.py --list-projects
 """
 
 import argparse
@@ -183,7 +184,50 @@ def render_transcript(project: str, date: str, uuid: str, turns: list) -> str:
     return "\n".join(lines)
 
 
-def iter_conversation_files(projects_dir: Path):
+def load_processed_state(output_dir: Path, project_filter: str | None) -> dict[str, dict]:
+    """Return uuid -> {processed, memories_written} from an existing manifest."""
+    manifest_path = output_dir / "manifest.json"
+    if not manifest_path.is_file():
+        return {}
+    try:
+        data = json.loads(manifest_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return {}
+    state = {}
+    for item in data:
+        if project_filter is not None and item.get("project") != project_filter:
+            continue
+        uuid = item.get("uuid")
+        if not uuid:
+            continue
+        state[uuid] = {
+            "processed": bool(item.get("processed")),
+            "memories_written": item.get("memories_written", 0),
+        }
+    return state
+
+
+def list_projects(projects_dir: Path) -> list[str]:
+    names = []
+    for project_dir in sorted(projects_dir.iterdir()):
+        if not project_dir.is_dir():
+            continue
+        project = project_name_from_dir(project_dir.name)
+        if project in SKIP_PROJECTS:
+            continue
+        transcripts_root = project_dir / "agent-transcripts"
+        if not transcripts_root.is_dir():
+            continue
+        if any(
+            (conv_dir / f"{conv_dir.name}.jsonl").is_file()
+            for conv_dir in transcripts_root.iterdir()
+            if conv_dir.is_dir()
+        ):
+            names.append(project)
+    return names
+
+
+def iter_conversation_files(projects_dir: Path, project_filter: str | None = None):
     for project_dir in sorted(projects_dir.iterdir()):
         if not project_dir.is_dir():
             continue
@@ -191,6 +235,8 @@ def iter_conversation_files(projects_dir: Path):
         project = project_name_from_dir(project_dir.name)
         if project in SKIP_PROJECTS:
             print(f"skip (excluded): {project}")
+            continue
+        if project_filter is not None and project != project_filter:
             continue
 
         transcripts_root = project_dir / "agent-transcripts"
@@ -220,6 +266,10 @@ def main():
                         help="Path to Cursor projects directory")
     parser.add_argument("--output-dir", default=os.path.expanduser("~/.cursor/replay"),
                         help="Root output directory for transcripts and manifest")
+    parser.add_argument("--project",
+                        help="Extract only this project (manifest contains only its conversations)")
+    parser.add_argument("--list-projects", action="store_true",
+                        help="Print available project names and exit")
     args = parser.parse_args()
 
     projects_dir = Path(args.projects_dir)
@@ -229,10 +279,31 @@ def main():
         print(f"error: projects dir not found: {projects_dir}", file=sys.stderr)
         sys.exit(1)
 
-    manifest = []
-    processed = skipped = 0
+    if args.list_projects:
+        for name in list_projects(projects_dir):
+            print(name)
+        return
 
-    for project, jsonl_files in iter_conversation_files(projects_dir):
+    project_filter = args.project
+    if project_filter is not None:
+        available = list_projects(projects_dir)
+        if project_filter not in available:
+            print(f"error: project not found: {project_filter}", file=sys.stderr)
+            if available:
+                print("available projects:", file=sys.stderr)
+                for name in available:
+                    print(f"  {name}", file=sys.stderr)
+            else:
+                print("no projects with agent transcripts found", file=sys.stderr)
+            sys.exit(1)
+
+    prior_state = load_processed_state(output_dir, project_filter)
+    manifest = []
+    processed = skipped = resumed = 0
+    projects_seen = 0
+
+    for project, jsonl_files in iter_conversation_files(projects_dir, project_filter):
+        projects_seen += 1
         print(f"\n{project} ({len(jsonl_files)} conversations)")
 
         for jfile in jsonl_files:
@@ -252,7 +323,7 @@ def main():
             token_estimate = estimate_tokens(transcript_text)
             full_path = output_dir / "transcripts" / project / f"{date}-{uuid[:8]}.txt"
 
-            manifest.append({
+            entry = {
                 "project": project,
                 "date": date,
                 "uuid": uuid,
@@ -260,7 +331,12 @@ def main():
                 "user_turns": user_turns,
                 "estimated_tokens": token_estimate,
                 "processed": False,
-            })
+            }
+            if uuid in prior_state and prior_state[uuid]["processed"]:
+                entry["processed"] = True
+                entry["memories_written"] = prior_state[uuid]["memories_written"]
+                resumed += 1
+            manifest.append(entry)
 
             if not args.dry_run:
                 full_path.parent.mkdir(parents=True, exist_ok=True)
@@ -268,6 +344,10 @@ def main():
 
             print(f"  {date}-{uuid[:8]}  {user_turns} user turns  ~{token_estimate:,} tokens")
             processed += 1
+
+    if project_filter is not None and projects_seen == 0:
+        print(f"error: no conversations found for project: {project_filter}", file=sys.stderr)
+        sys.exit(1)
 
     manifest.sort(key=lambda x: x["date"])
 
@@ -278,8 +358,11 @@ def main():
         print(f"\nmanifest written: {manifest_path}")
 
     total_tokens = sum(e["estimated_tokens"] for e in manifest)
+    scope = project_filter if project_filter else "all projects"
     print(f"\n{'DRY RUN — ' if args.dry_run else ''}done")
+    print(f"  scope                   : {scope}")
     print(f"  conversations extracted : {processed}")
+    print(f"  already processed       : {resumed}")
     print(f"  conversations skipped   : {skipped}")
     print(f"  total estimated tokens  : {total_tokens:,}")
     print(f"  output dir              : {output_dir}")

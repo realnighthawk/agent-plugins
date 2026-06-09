@@ -14,7 +14,7 @@ plugins/cursor/
 │   ├── agent-brain/SKILL.md     # memory write protocol (injected at session start)
 │   └── replay-memory/SKILL.md   # historical transcript → memory extraction
 ├── scripts/
-│   └── extract_conversations.py # Phase 1 replay: ~/.cursor/projects → ~/.cursor/replay
+│   └── extract_conversations.py # Phase 1 replay: --project NAME, --list-projects
 └── templates/                   # mcp.json, hooks.json templates
 ```
 

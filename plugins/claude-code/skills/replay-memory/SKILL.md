@@ -1,28 +1,74 @@
 # Replay Memory Extraction
 
 Extract memories from historical Claude Code conversation transcripts into agent-brain.
-Reads `~/.claude/replay/manifest.json`, dispatches one subagent per conversation (or chunk
+Runs Phase 1 extraction via `extract_conversations.py`, then reads
+`~/.claude/replay/manifest.json`, dispatches one subagent per conversation (or chunk
 for large conversations), and updates the manifest as work progresses. Fully resumable —
 re-invoking the skill skips already-processed items.
 
-## Pre-requisites
+## Invocation
 
-Phase 1 must have been run first:
+The user names a project to replay:
 
-```bash
-python3 /Users/abishekkumar/Documents/agent-plugins/scripts/extract_conversations.py
+```
+replay agent-brain
+replay agent-brain limit 3
+replay agent-brain dry run
+replay all projects
 ```
 
-This produces `~/.claude/replay/manifest.json` and the transcript files it references.
+Parse from the user's message:
+- **project** (required unless they say "all projects") — e.g. `agent-brain`, `agent-plugins`
+- **limit N** — stop after N conversations
+- **dry run** — extract only; print what would be replayed; do not dispatch subagents or write memories
+- **start from {date}** — skip conversations before this date during replay
 
 ---
 
 ## Process
 
+### Step 0 — Extract transcripts (Phase 1)
+
+Run the extraction script with the Bash tool **before** loading the manifest.
+
+**Script path** (use the first that exists):
+1. `${CLAUDE_PLUGIN_ROOT}/scripts/extract_conversations.py` (installed plugin)
+2. `plugins/claude-code/scripts/extract_conversations.py` (local checkout)
+3. `scripts/extract_conversations.py` (repo root)
+
+**Command:**
+
+```bash
+# Single project (default — user always names a project)
+python3 <script> --project {project}
+
+# All projects (only when user explicitly says "all projects")
+python3 <script>
+
+# Dry run — preview extraction without writing files
+python3 <script> --project {project} --dry-run
+```
+
+If the script exits non-zero or prints `error: project not found`, run:
+
+```bash
+python3 <script> --list-projects
+```
+
+Report the available project names and stop. Do not guess project slugs.
+
+On success, report extraction summary from script stdout (conversations extracted, token estimate).
+
+If dry run, stop after extraction summary — do not proceed to Steps 1–3.
+
 ### Step 1 — Load manifest
 
-Read `~/.claude/replay/manifest.json`. Filter to items where `"processed": false`, sorted
-by `"date"` ascending (chronological). Count and report:
+Read `~/.claude/replay/manifest.json`. When `--project` was used, the manifest contains
+only that project's conversations. Filter to items where `"processed": false`, sorted
+by `"date"` ascending (chronological). Apply optional `start from {date}` and `limit N`
+filters from the user's message.
+
+Count and report:
 
 ```
 Manifest loaded. N conversations pending, M already processed.
@@ -168,9 +214,9 @@ After all items are processed:
 
 ```
 Replay complete.
+  Project                 : {project}
   Conversations processed : N
   Total memories written  : M
-  Projects covered        : [list]
 ```
 
 Contradiction detection runs automatically in the background — no manual verification step needed.
@@ -181,15 +227,16 @@ corrected or removed on-demand via the memory explorer.
 
 ## Resuming
 
-If the skill is interrupted mid-run, re-invoke it. The manifest tracks `"processed": true`
-per item, so already-completed conversations are skipped automatically.
+Re-invoke with the same project name. Step 0 re-extracts transcripts and preserves
+`"processed": true` for conversations already completed in the prior manifest (matched by UUID).
+Only pending conversations are replayed.
 
 To re-process a specific conversation, set its `"processed": false` in the manifest and
 re-invoke.
 
-## Flags (pass as natural language when invoking)
+## Manual extraction (optional)
 
-- **"dry run"** — print what would be dispatched without calling any subagents or writing memories
-- **"only {project}"** — process only conversations from the named project
-- **"start from {date}"** — skip conversations before this date
-- **"limit N"** — stop after processing N conversations (useful for testing with a small batch first)
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/extract_conversations.py" --project agent-brain
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/extract_conversations.py" --list-projects
+```

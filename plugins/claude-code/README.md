@@ -13,7 +13,7 @@ plugins/claude-code/
 ├── .claude-plugin/plugin.json   # manifest (required)
 ├── .mcp.json                    # hosted MCP (http → /sse)
 ├── hooks/hooks.json             # SessionStart, UserPromptSubmit, Stop
-├── scripts/                     # hook commands (${CLAUDE_PLUGIN_ROOT}/scripts/...)
+├── scripts/                     # hooks + extract_conversations.py (--project, --list-projects)
 ├── skills/agent-brain/     # SKILL.md for /agent-brain:...
 ├── bin/mcp-call                 # build locally (gitignored)
 └── .env.example
@@ -55,6 +55,22 @@ Set environment variables in your shell or Claude Code user config (see `.env.ex
 Register the agent id in **Memory Explorer → Settings** (`iam_service_accounts` for your user).
 
 After changing hooks or `.mcp.json`, run `/reload-plugins` or restart Claude Code.
+
+## Historical replay
+
+In Claude Code chat, invoke the bundled **replay-memory** skill:
+
+```
+replay agent-brain
+replay agent-brain limit 3 dry run
+```
+
+The skill runs `extract_conversations.py` (Phase 1) then dispatches subagents to write
+memories under `agent_id = claude-code-replay`. After plugin updates:
+
+```bash
+./plugins/claude-code/update.sh --api-key YOUR_KEY
+```
 
 ## Agent id conventions
 
