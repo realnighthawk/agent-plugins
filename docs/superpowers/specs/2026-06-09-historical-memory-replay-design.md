@@ -112,9 +112,16 @@ Sort manifest by `date` ascending — chronological processing ensures later dec
 
 ## Phase 2 — LLM Memory Extraction
 
-**Unit of work:** One conversation transcript → zero or more `memory_write_batch` calls.
+**Unit of work:** One conversation transcript (or chunk) → zero or more `memory_write_batch` calls.
 
-**Execution model:** One Claude Code subagent per conversation. The subagent has agent-brain MCP access. It reads the transcript, calls `list_entity_types` once to load the taxonomy, extracts memories, and writes them via `memory_write_batch`. It then marks the conversation `"processed": true` in the manifest.
+**Execution model:** A Claude Code skill (`replay-memory-extraction`) invoked in the current
+session. The skill reads the manifest, dispatches one `Agent` subagent per unit (conversation
+or chunk), and updates the manifest as each unit completes. Running inside the session means
+MCP tools are already wired — no subprocess plumbing or credential passing required.
+
+**Skill location:** `plugins/claude-code/skills/replay-memory-extraction.md`
+
+**Invoke with:** `/replay-memory-extraction` in a Claude Code session (after running Phase 1).
 
 ### Subagent prompt template
 
@@ -256,9 +263,9 @@ After all conversations are processed, run the following checks in a single Clau
 
 | Phase | Time | Cost |
 |---|---|---|
-| Write extraction script | ~1 session | $0 |
+| Write extraction script (Phase 1) | ~1 session | $0 |
 | Run extraction script | <1 min | $0 |
-| Write Phase 2 runner script | ~1 session | $0 |
+| Write Phase 2 skill | ~1 session | $0 |
 | Process 48 conversations + ~10 extra chunks for large ones | 2–3 sessions | ~$8–20 API |
 | Verification | ~30 min | <$1 |
 
