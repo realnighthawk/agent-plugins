@@ -55,9 +55,35 @@ Multiple signals → multiple writes, all in this turn. No crystallization → s
 | Fact derived from a tool or API result | `inferred_fact` | `tool-output` | 0.85–0.90 |
 | Ground-truth — user identity, canonical system state, immutable project fact | `canonical_fact` | `canonical` | 1.0 |
 
+**Session start — call once per session before writing:**
+```
+list_entity_types({ agent_id: "<your-agent-id>" })
+```
+This returns the active taxonomy (6 roots + any user-registered subtypes). If you encounter a kind of thing not in the list, register it before writing:
+```
+register_entity_type({ agent_id: "...", name: "football-club", parent: "concept", description: "An association football club or team" })
+```
+Name must be kebab-case. Parent must already exist. Description must be ≥10 chars.
+
 **Common fields (all writes):**
-- `subject` — short canonical label, topic-derived, max ~3 words: `"testing-approach"`, `"vacation-plans"`. Never include dates or raw message text. **For preference or behavioral memories, embed the relevant domain keyword in the subject** so the preferences rollup can classify them correctly. Call `memory_preference_profile({})` to discover active domains, then use those labels in subjects (e.g. if `"fitness"` is a domain, use `"fitness-goals"` not `"preferences"`).
+- `entity_type` — from the registered taxonomy (e.g. `"person"`, `"place"`, `"concept"`, `"artifact"`, `"event"`, `"organism"`, or a registered subtype like `"football-club"`). Use `person` for humans and AI agents. Use `concept` for organizations, topics, ideas, social constructs.
+- `concept` — kebab-case name for this specific entity: `"nighthawk"`, `"manchester-united"`, `"fitness-goals"`. Max ~4 words. No dates, no event names.
 - `content` — one self-contained declarative sentence. Write the conclusion, not the path to it.
+
+**Choosing entity_type + concept:**
+
+| What you're writing about | entity_type | concept example |
+|---|---|---|
+| The user (nighthawk) | `person` | `nighthawk` |
+| An AI agent | `person` (subtype: `agent`) | `claude-code` |
+| A city or location | `place` | `manchester` |
+| A football club | `concept` (or register `football-club`) | `manchester-united` |
+| A software tool | `artifact` | `agent-brain` |
+| A project or idea | `concept` | `entity-taxonomy` |
+| A workout session | `event` | `morning-workout` |
+| An animal or plant | `organism` | `max-the-dog` |
+
+Use `memory_write_batch` when writing 2+ memories in one turn — more efficient than sequential calls.
 
 **`canonical_fact` constraint:** Writing one invalidates all prior memories on the same subject and cascades contradiction flags against all inferred memories on that subject. Use only when the fact is authoritative and permanent — not for preferences, decisions, or anything that could evolve.
 
