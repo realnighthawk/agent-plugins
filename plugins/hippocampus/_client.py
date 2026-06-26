@@ -4,19 +4,20 @@ from __future__ import annotations
 import json
 import time
 import logging
-from typing import Any
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
 _TOOL_CALL_METHOD = "tools/call"
+_MCP_PROTOCOL_VERSION = "2024-11-05"
 
 
 class AgentBrainClient:
     """Thin HTTP wrapper around the agent-brain MCP endpoint.
 
-    Uses StreamableHTTP transport: POST JSON-RPC 2.0 to {url}, with
-    Accept: application/json to request a non-streaming response.
-    Falls back to parsing SSE if the server streams anyway.
+    Follows StreamableHTTP transport: POST JSON-RPC 2.0 to {url}.
+    Performs the MCP initialize handshake on first use to obtain a
+    session ID, then includes Mcp-Session-Id on all subsequent calls.
     """
 
     def __init__(self, url: str, api_key: str, agent_id: str, timeout: float = 15.0) -> None:
@@ -25,6 +26,7 @@ class AgentBrainClient:
         self._agent_id = agent_id
         self._timeout = timeout
         self._client = None  # lazy-initialised httpx.Client
+        self._session_id: Optional[str] = None
 
     def _get_client(self):
         if self._client is None:
@@ -46,8 +48,29 @@ class AgentBrainClient:
             )
         return self._client
 
+    def _ensure_session(self) -> None:
+        """Perform MCP initialize handshake if we don't have a session yet."""
+        if self._session_id:
+            return
+        client = self._get_client()
+        payload = {
+            "jsonrpc": "2.0",
+            "id": "init-1",
+            "method": "initialize",
+            "params": {
+                "protocolVersion": _MCP_PROTOCOL_VERSION,
+                "capabilities": {},
+                "clientInfo": {"name": "hippocampus", "version": "1.0.0"},
+            },
+        }
+        resp = client.post(self._url, json=payload)
+        resp.raise_for_status()
+        self._session_id = resp.headers.get("Mcp-Session-Id", "")
+        logger.debug("agent-brain session established: %s", self._session_id)
+
     def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> Any:
         """Call a tool and return the parsed result dict. Raises on error."""
+        self._ensure_session()
         payload = {
             "jsonrpc": "2.0",
             "id": f"{tool_name}-{int(time.time() * 1000)}",
@@ -55,8 +78,18 @@ class AgentBrainClient:
             "params": {"name": tool_name, "arguments": arguments},
         }
         client = self._get_client()
+        headers = {}
+        if self._session_id:
+            headers["Mcp-Session-Id"] = self._session_id
         try:
-            resp = client.post(self._url, json=payload)
+            resp = client.post(self._url, json=payload, headers=headers)
+            if resp.status_code == 404:
+                # Session may have expired — reset and retry once
+                self._session_id = None
+                self._ensure_session()
+                if self._session_id:
+                    headers["Mcp-Session-Id"] = self._session_id
+                resp = client.post(self._url, json=payload, headers=headers)
             resp.raise_for_status()
         except Exception as exc:
             logger.warning("agent-brain %s request failed: %s", tool_name, exc)
