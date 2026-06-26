@@ -27,7 +27,7 @@ test -f "/tmp/agent-brain-subjects-${sid}"
 test -f "/tmp/agent-brain-skill-block-${sid}"
 grep -q "Entity taxonomy" "/tmp/agent-brain-skill-block-${sid}"
 
-echo "== session-start: all tiers fail -> bundled plugin skill only =="
+echo "== session-start: all tiers fail -> clean start =="
 sid=$(cat "$CURSOR_PROJECT_DIR/.cursor/state/agent-brain-session")
 rm -f "/tmp/agent-brain-skill-block-${sid}"
 FAIL_MOCK=$(mktemp); chmod +x "$FAIL_MOCK"
@@ -36,10 +36,9 @@ REAL_MOCK="${NIGHTHAWK_MCP_CALL}"
 export NIGHTHAWK_MCP_CALL="$FAIL_MOCK"
 out=$("${ROOT}/hooks/session-start.sh" < "${ROOT}/tests/fixtures/session-start.json")
 echo "$out" | jq -e '. == {}' >/dev/null
-test -f "/tmp/agent-brain-skill-block-${sid}"
-grep -q "Cursor Memory Protocol" "/tmp/agent-brain-skill-block-${sid}"
+test ! -f "/tmp/agent-brain-skill-block-${sid}"
 export NIGHTHAWK_MCP_CALL="$REAL_MOCK"
-rm -f "$FAIL_MOCK" "/tmp/agent-brain-skill-block-${sid}"
+rm -f "$FAIL_MOCK"
 
 echo "== recall =="
 out=$("${ROOT}/hooks/recall.sh" < "${ROOT}/tests/fixtures/recall-prompt.json")

@@ -96,6 +96,8 @@ resolve_plugin_dir() {
     git clone --depth=1 --branch "${AGENT_PLUGINS_REF}" "$repo_url" "$repo_dest" >&2
   fi
 
+  plugins_sync_memory_skills "$repo_dest"
+
   echo "${repo_dest}/plugins/openclaw"
 }
 
@@ -142,6 +144,10 @@ install_mcp_call() {
 }
 
 PLUGIN_DIR="$(resolve_plugin_dir)"
+
+if [[ -n "${LOCAL_CHECKOUT}" ]]; then
+  plugins_sync_memory_skills "${LOCAL_CHECKOUT}"
+fi
 
 echo "Installing mcp-call..."
 install_mcp_call "${PLUGIN_DIR}/bin/mcp-call"
@@ -213,9 +219,6 @@ if [[ -n "$EXTRA_CONFIG_FILE" ]]; then
   merge_openclaw_config "$EXTRA_CONFIG_FILE"
 fi
 
-# Plugin instruction skills live in ${PLUGIN_DIR}/skills/ and are loaded
-# directly by OpenClaw via --link. No ingest_skill step needed.
-
 if [[ "$SKIP_PLUGIN_INSTALL" -eq 0 ]]; then
   echo "Linking plugin with OpenClaw..."
   openclaw plugins install --link "${PLUGIN_DIR}"
@@ -237,7 +240,6 @@ if [[ -n "$EXTRA_CONFIG_FILE" ]]; then
   echo "  Extra config: ${EXTRA_CONFIG_FILE}"
 fi
 echo ""
-echo "Re-ingest skills after updates: source ${ENV_FILE} && ${PLUGIN_DIR}/bin/mcp-call ingest_skill ..."
 echo "Optional: source ${ENV_FILE} in your shell for env-based overrides."
 echo ""
 echo "Server checklist:"

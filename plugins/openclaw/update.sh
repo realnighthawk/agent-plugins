@@ -34,7 +34,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -n "${LOCAL_CHECKOUT}" ]]; then
-  echo "Local checkout — plugin dir is already up to date."
+  echo "Local checkout — syncing memory skills..."
+  plugins_sync_memory_skills "${LOCAL_CHECKOUT}"
   PLUGIN_DIR="${LOCAL_CHECKOUT}/plugins/openclaw"
 else
   repo_dest="${HOME}/.local/share/agent-brain/agent-plugins"
@@ -45,6 +46,7 @@ else
   echo "Updating agent-plugins repo at ${repo_dest}..."
   git -C "$repo_dest" fetch --depth=1 origin "${AGENT_PLUGINS_REF}"
   git -C "$repo_dest" checkout FETCH_HEAD
+  plugins_sync_memory_skills "$repo_dest"
   PLUGIN_DIR="${repo_dest}/plugins/openclaw"
 fi
 

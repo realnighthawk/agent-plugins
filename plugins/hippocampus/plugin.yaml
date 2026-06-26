@@ -1,0 +1,21 @@
+name: hippocampus
+version: "1.0.0"
+description: >
+  Long-term episodic memory backed by agent-brain (Nighthawk Labs).
+  Replaces Hermes's built-in memory tool with memory_write, memory_search,
+  memory_recall, and memory_graph. Auto-prefetches relevant context before
+  each turn and auto-saves conversation turns in the background.
+requires_env:
+  - name: NIGHTHAWK_MCP_URL
+    description: "agent-brain MCP endpoint (e.g. https://agent-memory.nighthawklabs.org/mcp)"
+    prompt: "agent-brain MCP URL"
+  - name: NIGHTHAWK_API_KEY
+    description: "agent-brain API key"
+    prompt: "agent-brain API key (nh_...)"
+    password: true
+optional_env:
+  - name: NIGHTHAWK_AGENT_ID
+    description: "Agent identifier in memory (defaults to hermes)"
+    prompt: "Agent ID"
+pip_dependencies:
+  - httpx>=0.27

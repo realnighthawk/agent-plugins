@@ -51,3 +51,12 @@ plugins_repo_root() {
 agent_brain_repo_root() {
   plugins_repo_root "$1"
 }
+
+# Assemble memory-write/SKILL.md from plugins/shared fragments (local dev / clone installs).
+plugins_sync_memory_skills() {
+  local root="$1"
+  local sync="${root}/scripts/sync-agent-brain-skills.sh"
+  if [[ -f "$sync" ]]; then
+    bash "$sync"
+  fi
+}

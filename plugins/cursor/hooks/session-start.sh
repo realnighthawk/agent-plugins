@@ -69,15 +69,6 @@ wait
 agent_brain_collect_subjects "$tmp_a" "$tmp_u" "$tmp_p"
 block=$(agent_brain_build_skill_block "$tmp_a" "$tmp_u" "$tmp_p")
 
-# Prepend the bundled plugin instruction skill (read locally — not from agent-brain).
-plugin_skill_file="${SCRIPT_DIR}/../skills/agent-brain/SKILL.md"
-if [[ -f "$plugin_skill_file" ]]; then
-  plugin_skill=$(cat "$plugin_skill_file")
-  if [[ -n "$plugin_skill" ]]; then
-    [[ -n "$block" ]] && block="${plugin_skill}"$'\n\n'"${block}" || block="${plugin_skill}"
-  fi
-fi
-
 if [[ -s "$tmp_et" ]]; then
   taxonomy_block=$(agent_brain_format_entity_types "$(cat "$tmp_et")" || true)
   if [[ -n "$taxonomy_block" ]]; then

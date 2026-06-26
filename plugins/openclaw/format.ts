@@ -1,23 +1,66 @@
-export type MemoryRow = {
-  subject_raw?: string;
-  SubjectRaw?: string;
-  content?: string;
-  Content?: string;
-  confidence?: number;
-  Confidence?: number;
+export type AssembledEMU = {
+  episode_cluster_id?: string;
+  support_count?: number;
+  activation_score?: number;
+  temporal_bucket?: string;
+  stability_score?: number;
+  salience?: number;
 };
 
-export function formatRecallBlock(rows: MemoryRow[], maxItems: number): string {
-  const list = Array.isArray(rows) ? rows : (rows as { memories?: MemoryRow[] }).memories ?? [];
-  const slice = list.slice(0, maxItems);
-  if (slice.length === 0) return "";
+export type MemoryRecallResponse = {
+  query_hash?: string;
+  emus?: AssembledEMU[];
+  context_tags?: string[];
+  duration_ms?: number;
+};
 
-  const lines = slice.map((m) => {
-    const subj = m.subject_raw ?? m.SubjectRaw ?? "fact";
-    const content = m.content ?? m.Content ?? "";
-    const conf = m.confidence ?? m.Confidence ?? 0.8;
-    return `- [${subj}] ${content} (conf ${conf})`;
-  });
+export type EntityResult = {
+  name?: string;
+  aliases?: string[];
+};
+
+export type PredicateResult = {
+  name?: string;
+  description?: string;
+  inverse_name?: string;
+  is_root?: boolean;
+};
+
+export type MemorySearchResponse = {
+  entities?: EntityResult[];
+  predicates?: PredicateResult[];
+};
+
+export function formatRecallBlock(
+  raw: string | MemoryRecallResponse,
+  maxItems: number,
+): string {
+  let resp: MemoryRecallResponse;
+  if (typeof raw === "string") {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return "";
+      resp = parsed as MemoryRecallResponse;
+    } catch {
+      return "";
+    }
+  } else {
+    resp = raw;
+  }
+
+  const tags = resp.context_tags ?? [];
+  const emus = (resp.emus ?? []).slice(0, maxItems);
+  if (tags.length === 0 && emus.length === 0) return "";
+
+  const lines: string[] = [];
+  if (tags.length > 0) {
+    lines.push(`context: ${tags.join(", ")}`);
+  }
+  for (const emu of emus) {
+    const cluster = emu.episode_cluster_id ?? "unknown";
+    const score = (emu.activation_score ?? 0).toFixed(2);
+    lines.push(`- [${cluster}] activation ${score}`);
+  }
 
   return [
     "<untrusted-data agent-brain>",
@@ -27,70 +70,29 @@ export function formatRecallBlock(rows: MemoryRow[], maxItems: number): string {
   ].join("\n");
 }
 
-export type IntentionRow = {
-  id?: string;
-  ID?: string;
-  topic?: string;
-  content?: string;
-  status?: string;
-};
-
-function parseIntentions(raw: string): IntentionRow[] {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed as IntentionRow[];
-    if (parsed !== null && typeof parsed === "object") {
-      const p = parsed as Record<string, unknown>;
-      if (Array.isArray(p.intentions)) return p.intentions as IntentionRow[];
+export function formatSearchBlock(raw: string | MemorySearchResponse): string {
+  let resp: MemorySearchResponse;
+  if (typeof raw === "string") {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return "";
+      resp = parsed as MemorySearchResponse;
+    } catch {
+      return "";
     }
-  } catch {
-    // ignore
+  } else {
+    resp = raw;
   }
-  return [];
-}
 
-export type EntityTypeRow = {
-  name?: string;
-  is_root?: boolean;
-  description?: string;
-};
-
-function parseEntityTypes(raw: string): EntityTypeRow[] {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (parsed !== null && typeof parsed === "object") {
-      const p = parsed as Record<string, unknown>;
-      if (Array.isArray(p.types)) return p.types as EntityTypeRow[];
-    }
-    if (Array.isArray(parsed)) return parsed as EntityTypeRow[];
-  } catch {
-    // ignore
+  const lines: string[] = [];
+  for (const e of resp.entities ?? []) {
+    const aliases = e.aliases?.length ? ` (${e.aliases.join(", ")})` : "";
+    lines.push(`- entity: ${e.name ?? "unknown"}${aliases}`);
   }
-  return [];
-}
-
-export function formatEntityTypesBlock(raw: string): string {
-  const types = parseEntityTypes(raw);
-  if (types.length === 0) return "";
-  const lines = types.map((t) => {
-    const root = t.is_root ? " (root)" : "";
-    return `- ${t.name ?? "unknown"}${root}: ${t.description ?? ""}`;
-  });
-  return ["## Entity taxonomy (agent-brain)", ...lines].join("\n");
-}
-
-export function formatIntentionsBlock(raw: string): string {
-  const intentions = parseIntentions(raw).filter(
-    (i) => i.status === "pending" || i.status === "triggered",
-  );
-  if (intentions.length === 0) return "";
-  const lines = intentions.map((i) => `- [intention: ${i.topic ?? "task"}] ${i.content ?? ""}`);
-  return ["## Pending intentions", ...lines].join("\n");
-}
-
-export function extractTriggeredIds(raw: string): string[] {
-  return parseIntentions(raw)
-    .filter((i) => i.status === "triggered")
-    .map((i) => i.id ?? i.ID ?? "")
-    .filter(Boolean);
+  for (const p of resp.predicates ?? []) {
+    const root = p.is_root ? " (root)" : "";
+    lines.push(`- predicate: ${p.name ?? "unknown"}${root}`);
+  }
+  if (lines.length === 0) return "";
+  return ["## Known vocabulary (agent-brain)", ...lines].join("\n");
 }

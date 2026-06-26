@@ -112,7 +112,9 @@ Sort manifest by `date` ascending — chronological processing ensures later dec
 
 ## Phase 2 — LLM Memory Extraction
 
-**Unit of work:** One conversation transcript (or chunk) → zero or more `memory_write_batch` calls.
+**Unit of work:** One conversation transcript (or chunk) → zero or more episodic `memory_write` calls (one event per atomic fact or related fact group).
+
+**Write API:** Use `search_event_context` then `memory_write` with `facts[]` SPO triples — not `memory_write_batch` (removed).
 
 **Execution model:** A Claude Code skill (`replay-memory-extraction`) invoked in the current
 session. The skill reads the manifest, dispatches one `Agent` subagent per unit (conversation
@@ -156,7 +158,7 @@ EXTRACTION RULES:
    - User confirmed when asked → 0.80–0.85
    - Inferred from multiple consistent signals → 0.70–0.80
    - Skip if below 0.70 or speculative
-5. Use memory_write_batch for efficiency (max 20 per call).
+5. One episodic `memory_write` per atomic fact (or tightly related fact group); decompose — no batch tool.
 6. If a fact feels like a preference or decision that was later reversed in the same
    transcript, write only the final state.
 7. Do NOT write: routine code edits, file contents, test output, debugging steps.

@@ -4,7 +4,7 @@ Official [Claude Code plugin](https://code.claude.com/docs/en/plugins-reference)
 
 Client-only: connects to **hosted** agent-brain over HTTP/SSE. No Postgres or `go run` in the plugin.
 
-Bundled skills (`agent-brain`, `replay-memory`) are **local-only** — injected at session start from `skills/` on disk, not via `ingest_skill`.
+Bundled skills (`replay-memory`) are **local-only** — not uploaded to agent-brain via `ingest_skill`. Memory write/search protocol lives in server-side skills (`memory-write`, `memory-policy`, etc.) retrieved via MCP.
 
 ## Plugin layout
 
@@ -14,7 +14,7 @@ plugins/claude-code/
 ├── .mcp.json                    # hosted MCP (http → /sse)
 ├── hooks/hooks.json             # SessionStart, UserPromptSubmit, Stop
 ├── scripts/                     # hooks + extract_conversations.py (--project, --list-projects)
-├── skills/agent-brain/     # SKILL.md for /agent-brain:...
+├── skills/                      # replay-memory and other local skills
 ├── bin/mcp-call                 # build locally (gitignored)
 └── .env.example
 ```

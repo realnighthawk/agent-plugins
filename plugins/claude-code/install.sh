@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install Agent Brain Claude Code plugin (hosted SSE + hooks + skill).
+# Install Agent Brain Claude Code plugin (hosted SSE + hooks).
 #
 # Usage:
 #   ./plugins/claude-code/install.sh \
@@ -202,6 +202,10 @@ install_mcp_call() {
   echo "Installed ${dest} from release"
 }
 
+if [[ -n "${LOCAL_CHECKOUT}" ]]; then
+  plugins_sync_memory_skills "${LOCAL_CHECKOUT}"
+fi
+
 if [[ "$SKIP_PLUGIN_ADD" -eq 0 ]]; then
   register_claude_plugin
 fi
@@ -216,8 +220,7 @@ fi
 echo "Installing mcp-call..."
 install_mcp_call "${PLUGIN_DIR}/bin/mcp-call"
 
-# Plugin instruction skills are bundled locally and injected at session start.
-# No ingest_skill step needed — skills/ directory is read directly by session-start.sh.
+# Memory protocol skills (memory-write, memory-policy, etc.) are server-side — retrieved via MCP at session start.
 
 write_mcp_config() {
   local mcp_file="${PLUGIN_DIR}/.mcp.json"

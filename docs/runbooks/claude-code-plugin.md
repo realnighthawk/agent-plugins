@@ -2,7 +2,7 @@
 
 Official plugin under `plugins/claude-code/`. Connects to **hosted** agent-brain (HTTP MCP → SSE). No local database.
 
-**Spec:** [2026-06-04-claude-code-plugin-design.md](../superpowers/specs/2026-06-04-claude-code-plugin-design.md)
+**Spec:** [2026-06-04-claude-code-plugin-design.md](../superpowers/specs/2026-06-04-claude-code-plugin-design.md), [2026-06-24-memory-skill-layer-design.md](../superpowers/specs/2026-06-24-memory-skill-layer-design.md)
 
 ## Prerequisites
 
@@ -42,7 +42,7 @@ Verify in Claude Code: `/mcp` lists `agent-brain`. After hook changes: `/reload-
 
 ## Update
 
-Skips marketplace re-registration (`--skip-plugin-add`) but refreshes `mcp-call` and MCP config. From a local checkout, skill changes are live immediately — run `/reload-plugins` in Claude Code instead.
+Skips marketplace re-registration (`--skip-plugin-add`) but refreshes `mcp-call` and MCP config. From a local checkout, run `./scripts/sync-agent-brain-skills.sh` after editing shared memory fragments, then `/reload-plugins` in Claude Code.
 
 ```bash
 # Remote
@@ -81,7 +81,7 @@ plugins/claude-code/bin/mcp-call memory_search '{"query":"test","limit":3}'
 |-------|--------|
 | MCP not in `/mcp` | Plugin enabled; env vars set; `/reload-plugins` |
 | No recall context | `UserPromptSubmit` hook; Hooks debug log; `NIGHTHAWK_MCP_URL` |
-| No writes on stop | User prompt matched heuristic; `last-user-prompt` state file; policy |
+| No writes on stop | Expected — writes are per-turn via memory-write skill; Stop only completes intentions |
 | Wrong tenant | API key → user mapping; JWT `sub` |
 
 ## Project-only MCP (team)

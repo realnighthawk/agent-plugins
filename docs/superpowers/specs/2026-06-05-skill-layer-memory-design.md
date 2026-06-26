@@ -1,7 +1,8 @@
 # Skill-Layer Memory Backend — Design Spec
 
-**Date:** 2026-06-05
-**Status:** Implemented
+**Date:** 2026-06-05  
+**Last updated:** 2026-06-24  
+**Status:** Implemented (superseded in detail by [memory skill layer spec](./2026-06-24-memory-skill-layer-design.md))  
 **Scope:** Claude Code, Cursor, OpenClaw plugins + agent-brain server-side skills
 
 ---
@@ -10,12 +11,12 @@
 
 The three agent-brain plugins (Claude Code, Cursor, OpenClaw) share a common set of gaps:
 
-- **Capture is too narrow.** Only explicit preference keywords ("I prefer", "I like") trigger `memory_write`. Architectural decisions, debugging patterns, and workflow habits are missed.
+- **Capture is too narrow.** *(Resolved.)* Crystallization protocol in `memory-write` skill; Stop-hook regex heuristic removed.
 - **Recall is passive.** Memories are injected as a flat bullet list before each prompt but the AI has no model of who the user is at session start — it learns nothing from prior sessions before the first word is typed.
 - **Cross-agent inconsistency.** Claude Code and Cursor maintain separate runtime state; a preference expressed in one is not automatically available to the other.
 - **No personalization.** Communication style, expertise level, and project conventions are not part of the AI's operating context.
 
-The `memory_preference_profile` call in `session-start.sh` already fetches a user profile on every session — but the result is discarded (`>/dev/null`). The user tier is effectively free to add.
+The user tier (`memory_preference_profile`) is now merged into the session-start context block as `## Your profile`.
 
 ---
 
@@ -29,7 +30,7 @@ Server-side skill content is fetched once at session start, merged into a single
 |------|----------|---------|----------------|
 | **Agent** | `retrieve_skills_for_context("agent:<agent_id>")` | Tool discipline, memory rules, plugin-specific behavior | Rarely — authored once per plugin, updated with plugin releases |
 | **User** | `memory_preference_profile({})` | Communication style, expertise level, cross-session workflow preferences | Grows automatically as memories accumulate |
-| **Project** | `memory_search({query: <cwd_basename>, limit: 6})` | Repo conventions, architectural decisions, active work context | Updates each session as project memories are written |
+| **Project** | `memory_search({query: <cwd_basename>, limit: 6})` | Repo conventions, architectural decisions, active work context (EMU recall) | Updates as events are written and EMUs built |
 
 ---
 
@@ -75,10 +76,9 @@ Cross-agent consistency falls out naturally: user and project tiers are read fro
 - **`scripts/index.sh`** — Completion-only: reads triggered-intentions file → complete_intention per ID → deletes file. No new writes.
 - **`scripts/lib/session-skill.sh`** *(new)* — shared merge logic: truncate each tier, concatenate with section headers, enforce token cap
 - **`scripts/lib/format-recall.sh`** — added `agent_brain_format_intentions` alongside existing `agent_brain_format_recall`
-- **`scripts/ingest-skills.sh`** *(new)* — standalone re-ingest script; reads all `.md` files in `skills/` and calls `ingest_skill` for each
-- **`install.sh`** — calls `ingest_agent_skills()` after mcp-call installation; adds re-ingest hint to output
-- **`skills/agent-brain-claude-code.md`** *(new)* — agent-tier skill body (~1400 chars); contains after-each-response write/intention protocol (see below); ingested to server at install time
-- **`skills/agent-brain/SKILL.md`** — removed; agent-tier skill content is now server-side only
+- **`install.sh`** — memory protocol skills are server-side; `scripts/sync-agent-brain-skills.sh` assembles `memory-write/SKILL.md` from shared fragments
+- **Seven `memory-*` skills** — `memory-read`, `memory-write`, `memory-policy`, `memory-boundary`, `memory-context-injection`, `memory-personalization`, `memory-consistency` (see [2026-06-24 spec](./2026-06-24-memory-skill-layer-design.md))
+- **Removed:** `skills/agent-brain/SKILL.md`, `skills/agent-brain-claude-code.md` as sole protocol, `scripts/ingest-skills.sh`, `lib/index-heuristic.sh`
 
 ### Cursor (`plugins/cursor`)
 
@@ -90,18 +90,15 @@ Cross-agent consistency falls out naturally: user and project tiers are read fro
 
 - **`recall.ts`** — `before_prompt_build` fetches three tiers before injecting recall; returns `prependContext` with merged block
 - **`session-state.ts`** — fix local file growth: move from `~/.openclaw/agent-brain-state/` to `/tmp` keyed on session ID (matching the fix already applied to Claude Code and Cursor)
-- **`capture.ts`** — no change in this pass (Approach 3)
+- **`capture.ts`** — intention-completion only (heuristic removed)
 - **New: `session-skill.ts`** — TypeScript equivalent of merge logic
 
 ### Server-side (agent-brain)
 
-- **Three agent-tier skills ingested via `ingest_skill`:**
-  - `agent-brain-claude-code`
-  - `agent-brain-cursor`
-  - `agent-brain-openclaw`
-  - Content: current `SKILL.md` content, migrated and extended with personalization guidance
-- **User tier** — no new server work; `memory_preference_profile` already exists
-- **Project tier** — no new server work; `memory_search` with project scope already works
+- **`memory_search`** — `RecallEMU` pipeline; returns `MemoryAssembly` with EMUs (not flat `memories[]`)
+- **`memory_write`** — episodic event model via `EventWriter` (not single-fact `write.Writer`)
+- **`memory_preference_profile`** — domain-grouped rollups from legacy authoritative memories
+- **Agent-tier skills** — `retrieve_skills_for_context`; memory protocol skills intended for server ingest via `ingest_skill`
 
 ---
 
@@ -151,39 +148,27 @@ Cross-agent consistency falls out naturally: user and project tiers are read fro
 | Stop: complete_intention phase | Read file, call API per line, `rm -f` |
 | Session never reaches Stop (crash, kill) | File left in `/tmp`; harmless; cleaned by OS |
 
-### After-each-response protocol (agent tier — two-phase)
+### After-each-response protocol (`memory-write` skill)
 
-The agent-tier skill gives Claude an explicit two-phase protocol to run after every response. This is the primary capture path for mid-session facts; the Stop hook handles intention completion only.
+Primary capture path: **crystallization gate** — write only when something net-new should survive beyond the session. See `plugins/claude-code/skills/memory-write/SKILL.md` and [LLM-native per-turn spec](./2026-06-07-llm-native-per-turn-memory-design.md).
 
-**Phase 1 — Reflect:** Ask what emerged in this conversation turn that future-you wouldn't know from reading the code or git history. Use the full conversation context. List candidates before writing any.
+**Write routing:**
 
-**Phase 2 — Category Audit (backstop):** For each category below, if Phase 1 did not already produce a candidate, check explicitly:
-1. **Preference** — did the user state or confirm how they like things done?
-2. **Correction** — did the user push back, say you were wrong, or redirect?
-3. **Project constraint** — did a deadline, policy, convention, or scope limit emerge?
-4. **Architectural decision** — was a design choice, technology, or pattern decided or confirmed?
-5. **Deferred intention** — was something identified as "do later", "follow up", or "remind me"?
+| Content | Tool |
+|---------|------|
+| Fact / preference / decision / event | `memory_write` (episodic: `event_id`, `trigger`, `facts[]`, …) |
+| Task / follow-up | `set_intention` |
+| Reusable agent rule | `ingest_skill` |
 
-**Write protocol — Categories 1–4 → `memory_write`:**
-- `signal_type`: "user-stated" (explicit) | "inferred" (observed pattern)
-- `memory_type`: "stated_fact" | "inferred_fact"
-- `subject`: short canonical label derived from context; never include dates or raw message text
-- `content`: self-contained fact sentence, not a raw quote
-- `confidence`: 0.90–0.95 explicit, 0.80–0.85 confirmed, 0.65–0.75 inferred; skip if speculative
+**Pre-write:** `search_event_context` for canonical entity/predicate IDs.  
+**Policy:** `memory-policy` skill for sensitive-data blocks (not server-enforced on events).  
+**Confidence floor:** 0.65.
 
-**Category 5 → `set_intention`:** content + topic (short label for the deferred task)
+**Removed:** `signal_type`, `memory_type`, `subject`, `content` single-fact fields; `memory_write_batch`; Stop-hook writes.
 
-**Skill triggers** (agent calls `ingest_skill`):
-- User codifies a reusable project rule → `ingest_skill(name, body, description)`
-- Used for agent instructions, NOT preference facts
+### Recall formatter gap
 
-**Do not write:** routine code edits, file reads, "ok"/"thanks"/"looks good", facts already in recalled context that have not changed.
-
-### Subject propagation
-
-- Memories tagged with cwd hash → project tier next session
-- Memories tagged as preferences → user tier (`memory_preference_profile`) next session
-- No extra API calls needed; existing `memory_write` tagging is sufficient
+`format-recall.sh` expects legacy `{ memories: [{ content, subject_raw }] }`. `memory_search` returns `{ emus: [...] }`. Hook injection may be empty until formatters are updated — see [2026-06-24 spec](./2026-06-24-memory-skill-layer-design.md) §9.
 
 ---
 
@@ -255,11 +240,13 @@ Manual integration test: ingest three agent-tier skills, verify `retrieve_skills
 
 ---
 
-## Out of Scope
+## Out of Scope / Follow-up
 
-- **Approach 3 (AI-driven capture):** replacing keyword heuristics with AI judgment — deferred to a follow-on spec
-- **Skill authoring UX:** how users edit their user-tier skill — deferred
-- **Project tier pruning/TTL:** preventing project tier bloat over time — deferred
+- **EMU recall formatter** — update `format-recall.sh` for `MemoryAssembly` shape
+- **Server ingest of all seven memory skills** — only `memory-write` assembly is automated today
+- **Outcome feedback** — wire `FeedbackEMU` from plugins after responses
+- **Skill authoring UX** — how users edit their user-tier skill
+- **Project tier pruning/TTL**
 
 ---
 

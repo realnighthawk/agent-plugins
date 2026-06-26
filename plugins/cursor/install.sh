@@ -91,6 +91,10 @@ if [[ -z "$PLUGIN_DIR" || -z "$PLUGINS_ROOT" ]]; then
   PLUGIN_DIR="${PLUGINS_ROOT}/plugins/cursor"
 fi
 
+# shellcheck source=../../scripts/lib/install-repo.sh
+. "${PLUGINS_ROOT}/scripts/lib/install-repo.sh"
+plugins_sync_memory_skills "${PLUGINS_ROOT}"
+
 # shellcheck source=lib/plugin-install.sh
 . "${PLUGIN_DIR}/lib/plugin-install.sh"
 

@@ -2,7 +2,7 @@
 # Shared install/remove helpers for the Cursor Agent Brain plugin.
 # Source from install.sh / update.sh after setting PLUGIN_DIR and PLUGINS_ROOT.
 
-AGENT_BRAIN_SKILL_NAMES=(agent-brain replay-memory)
+AGENT_BRAIN_SKILL_NAMES=(replay-memory)
 AGENT_BRAIN_HOOK_FILES=(session-start.sh recall.sh index.sh)
 
 cursor_plugin_scope_dir() {

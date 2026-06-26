@@ -2,10 +2,10 @@
   "mcpServers": {
     "agent-brain": {
       "type": "http",
-      "url": "${NIGHTHAWK_MCP_URL}",
+      "url": "http://localhost:8899/mcp",
       "headers": {
-        "X-API-Key": "${NIGHTHAWK_API_KEY}",
-        "X-Agent-ID": "${NIGHTHAWK_AGENT_ID}"
+        "X-API-Key": "nh_bdcdffad0a6540c4b6f158db368950d8",
+        "X-Agent-ID": "claude-code-mac"
       }
     }
   }

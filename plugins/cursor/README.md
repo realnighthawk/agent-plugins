@@ -11,7 +11,7 @@ plugins/cursor/
 ├── .cursor-plugin/plugin.json   # manifest
 ├── hooks/                       # sessionStart, recall, index hook commands
 ├── skills/
-│   ├── agent-brain/SKILL.md     # memory write protocol (injected at session start)
+│   ├── replay-memory/SKILL.md   # transcript replay skill
 │   └── replay-memory/SKILL.md   # historical transcript → memory extraction
 ├── scripts/
 │   └── extract_conversations.py # Phase 1 replay: --project NAME, --list-projects
@@ -65,7 +65,7 @@ curl -fsSL https://raw.githubusercontent.com/realnighthawk/agent-plugins/main/pl
   --scope global --url https://agent-memory.nighthawklabs.org/mcp --agent-id cursor-you --api-key YOUR_KEY
 ```
 
-The script removes any existing Agent Brain install, builds `mcp-call`, copies hooks and **local** bundled skills (`agent-brain`, `replay-memory`), writes `agent-brain.env`, merges `agent-brain` into `mcp.json`, and installs `hooks.json`.
+The script removes any existing Agent Brain install, builds `mcp-call`, copies hooks and **local** bundled skills (`replay-memory`), writes `agent-brain.env`, merges `agent-brain` into `mcp.json`, and installs `hooks.json`.
 
 ## Update
 
@@ -75,7 +75,7 @@ Reinstall in place (credentials loaded from `agent-brain.env` if omitted):
 ./plugins/cursor/update.sh --scope global
 ```
 
-Bundled plugin skills are **not** uploaded to agent-brain — `session-start` reads them from disk. After editing skills in the repo, run `./scripts/sync-agent-brain-skills.sh` then `plugins/cursor/update.sh`.
+Bundled plugin skills are **not** uploaded to agent-brain. After editing shared write fragments, run `./scripts/sync-agent-brain-skills.sh` then `plugins/cursor/update.sh`.
 
 Restart Cursor. Enable **Hooks** in Settings and check the Hooks output channel.
 
