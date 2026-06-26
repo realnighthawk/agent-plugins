@@ -150,7 +150,13 @@ _MEMORY_GRAPH_SCHEMA: Dict[str, Any] = {
 # MemoryProvider implementation
 # ---------------------------------------------------------------------------
 
-class AgentBrainMemoryProvider:
+try:
+    from agent.memory_provider import MemoryProvider as _HermesMemoryProvider
+except ImportError:
+    _HermesMemoryProvider = object  # fallback for tests outside Hermes
+
+
+class AgentBrainMemoryProvider(_HermesMemoryProvider):
     """agent-brain memory backend for Hermes."""
 
     @property
