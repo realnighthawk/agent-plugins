@@ -318,6 +318,63 @@ class AgentBrainMemoryProvider(_HermesMemoryProvider):
             args = {"agent_id": self._agent_id, **args}
         return self._client.call_tool_safe(tool_name, args)
 
+    def on_memory_write(
+        self,
+        action: str,
+        target: str,
+        content: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Mirror built-in memory tool writes into agent-brain.
+
+        Called by Hermes whenever the built-in `memory` tool commits a write
+        (add/replace/remove) to either the `user` or `memory` target.
+        We forward it as a typed episodic event so agent-brain persists it
+        alongside everything written via memory_write directly.
+        """
+        agent_id = getattr(self, "_agent_id", "hermes")
+        session_id = getattr(self, "_session_id", "unknown")
+        meta = metadata or {}
+
+        event_type = f"user_profile_{action}" if target == "user" else f"memory_{action}"
+        observation_type = "user_preference" if target == "user" else "agent_note"
+
+        def _write() -> None:
+            try:
+                event_id = f"builtin-{target}-{action}-{int(time.time() * 1000)}"
+                payload: Dict[str, Any] = {
+                    "event_id": event_id,
+                    "type": event_type,
+                    "trigger": {
+                        "type": "agent",
+                        "content": f"memory {action} {target}: {content[:300]}",
+                    },
+                    "participants": [
+                        {"id": "user", "type": "self"},
+                        {"id": agent_id, "type": "agent"},
+                    ],
+                    "observations": [
+                        {
+                            "type": observation_type,
+                            "value": content,
+                            "confidence": 0.9,
+                        }
+                    ],
+                    "confidence": 0.9,
+                }
+                if meta.get("old_text"):
+                    payload["observations"].append({
+                        "type": "previous_value",
+                        "value": meta["old_text"],
+                        "confidence": 0.9,
+                    })
+                self._client.call_tool("memory_write", payload)
+                logger.debug("hippocampus mirrored builtin memory %s/%s", action, target)
+            except Exception as exc:
+                logger.debug("hippocampus on_memory_write failed: %s", exc)
+
+        threading.Thread(target=_write, daemon=True).start()
+
     def shutdown(self) -> None:
         if hasattr(self, "_client"):
             self._client.close()
