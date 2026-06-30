@@ -19,3 +19,5 @@ optional_env:
     prompt: "Agent ID"
 pip_dependencies:
   - httpx>=0.27
+hooks:
+  - on_memory_write
