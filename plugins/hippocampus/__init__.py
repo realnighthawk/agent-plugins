@@ -62,7 +62,7 @@ _MEMORY_WRITE_SCHEMA: Dict[str, Any] = {
             "facts": {
                 "type": "array",
                 "description": (
-                    'SPO triples. Each item: {"subject": "entity-id", "predicate": "prefers", '
+                    'SPO triples. Each item: {"entity": "entity-id", "predicate": "prefers", '
                     '"object": "entity-id-or-literal", "confidence": 0.95}'
                 ),
             },
@@ -132,7 +132,7 @@ _MEMORY_GRAPH_SCHEMA: Dict[str, Any] = {
     "parameters": {
         "type": "object",
         "properties": {
-            "subject": {
+            "entity": {
                 "type": "string",
                 "description": 'Entity canonical name e.g. "person:alice".',
             },
@@ -141,7 +141,7 @@ _MEMORY_GRAPH_SCHEMA: Dict[str, Any] = {
                 "description": '"topics" (default) — relationship map; "facts" — SPO triple view.',
             },
         },
-        "required": ["subject"],
+        "required": ["entity"],
     },
 }
 
