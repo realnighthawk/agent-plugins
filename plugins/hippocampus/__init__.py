@@ -136,9 +136,9 @@ _MEMORY_GRAPH_SCHEMA: Dict[str, Any] = {
                 "type": "string",
                 "description": 'Entity canonical name e.g. "person:alice".',
             },
-            "mode": {
-                "type": "string",
-                "description": '"topics" (default) — relationship map; "facts" — SPO triple view.',
+            "hops": {
+                "type": "integer",
+                "description": "How many hops to traverse from the seed entity (default 2, max 3).",
             },
         },
         "required": ["entity"],
