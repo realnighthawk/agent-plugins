@@ -199,7 +199,14 @@ class AgentBrainMemoryProvider(_HermesMemoryProvider):
             "Use `memory_write` to save preferences, facts, or decisions. "
             "Use `memory_search` to find existing entities before writing. "
             "Use `memory_recall` to retrieve relevant past context. "
-            "Auto-recall runs before each turn — check the Memory section above if present."
+            "Auto-recall runs before each turn — check the Memory section above if present.\n\n"
+            "**Graph connections rule:** When the object of a fact is a known entity "
+            "(person, agent, project, place), use their entity alias from the `entities` array "
+            "as the object — not a string literal. "
+            "Example: if Abishek works with Vickie, write "
+            "`{\"entity\": \"abishek\", \"predicate\": \"works_with\", \"object\": \"vickie\"}` "
+            "where both `abishek` and `vickie` are declared in the `entities` array. "
+            "This is what creates graph connections between entities."
         )
 
     # -- Prefetch (background recall before each turn) -----------------------
